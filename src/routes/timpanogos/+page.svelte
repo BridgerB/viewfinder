@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { asset } from '$app/paths';
 
 	interface Coordinate {
 		latitude: number;
@@ -78,7 +79,7 @@
 	};
 
 	onMount(async () => {
-		const response = await fetch('/timpanogos/api');
+		const response = await fetch(asset('/timpanogos.json'));
 		viewpoints = await response.json();
 		loading = false;
 	});
@@ -86,7 +87,7 @@
 
 <div class="container">
 	{#if loading}
-		<div class="loading">Generating 360 viewpoints...</div>
+		<div class="loading">Loading viewpoints...</div>
 	{:else}
 		{@const currentViewpoint = viewpoints[currentAngle]}
 		<h1>Mt Timpanogos - {currentAngle}°</h1>
