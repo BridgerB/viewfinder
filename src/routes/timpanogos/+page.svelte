@@ -1,0 +1,249 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+
+	interface Coordinate {
+		latitude: number;
+		longitude: number;
+	}
+
+	interface HorizonPoint {
+		relativeDirection: number;
+		elevationAngleDegrees: number;
+		distance_km: number;
+	}
+
+	interface Viewpoint {
+		angle: number;
+		viewpoint: Coordinate;
+		bearingToPeak: number;
+		horizon: HorizonPoint[];
+	}
+
+	interface RgbColor {
+		red: number;
+		green: number;
+		blue: number;
+	}
+
+	const MAX_ELEVATION_DEGREES = 25;
+	const MAX_DISTANCE_KM = 15;
+	const CLOSE_COLOR: RgbColor = { red: 255, green: 107, blue: 53 };
+	const FAR_COLOR: RgbColor = { red: 65, green: 88, blue: 208 };
+
+	const clamp = (value: number, min: number, max: number): number =>
+		Math.min(Math.max(value, min), max);
+
+	const linearInterpolate = (start: number, end: number, ratio: number): number =>
+		Math.round(start + (end - start) * ratio);
+
+	const interpolateColor = (fromColor: RgbColor, toColor: RgbColor, ratio: number): RgbColor => ({
+		red: linearInterpolate(fromColor.red, toColor.red, ratio),
+		green: linearInterpolate(fromColor.green, toColor.green, ratio),
+		blue: linearInterpolate(fromColor.blue, toColor.blue, ratio)
+	});
+
+	const rgbToString = (color: RgbColor): string => `rgb(${color.red},${color.green},${color.blue})`;
+
+	const calculateDistanceColor = (distanceKm: number): string => {
+		const interpolationRatio = clamp(distanceKm / MAX_DISTANCE_KM, 0, 1);
+		return rgbToString(interpolateColor(CLOSE_COLOR, FAR_COLOR, interpolationRatio));
+	};
+
+	const calculateBarHeight = (elevationDegrees: number): number =>
+		(elevationDegrees / MAX_ELEVATION_DEGREES) * 100;
+
+	const formatCoordinate = (coordinate: Coordinate): string =>
+		`${coordinate.latitude.toFixed(4)}°N, ${Math.abs(coordinate.longitude).toFixed(4)}°W`;
+
+	let viewpoints: Viewpoint[] = $state([]);
+	let currentAngle = $state(187);
+	let loading = $state(true);
+	let playing = $state(false);
+	let animationSpeed = $state(100);
+	let animationInterval: ReturnType<typeof setInterval>;
+
+	$effect(() => {
+		if (!playing) return () => {};
+
+		const intervalDelayMs = 500 - animationSpeed + 10;
+		animationInterval = setInterval(() => {
+			currentAngle = (currentAngle + 1) % 360;
+		}, intervalDelayMs);
+
+		return () => clearInterval(animationInterval);
+	});
+
+	const togglePlay = (): void => {
+		playing = !playing;
+	};
+
+	onMount(async () => {
+		const response = await fetch('/timpanogos/api');
+		viewpoints = await response.json();
+		loading = false;
+	});
+</script>
+
+<div class="container">
+	{#if loading}
+		<div class="loading">Generating 360 viewpoints...</div>
+	{:else}
+		{@const currentViewpoint = viewpoints[currentAngle]}
+		<h1>Mt Timpanogos - {currentAngle}°</h1>
+		<p class="subtitle">{formatCoordinate(currentViewpoint.viewpoint)}</p>
+
+		<div class="chart">
+			{#each currentViewpoint.horizon as horizonPoint (horizonPoint.relativeDirection)}
+				<div
+					class="bar"
+					style="--height: {calculateBarHeight(
+						horizonPoint.elevationAngleDegrees
+					)}%; --color: {calculateDistanceColor(horizonPoint.distance_km)}"
+					title="{horizonPoint.relativeDirection}° | {horizonPoint.elevationAngleDegrees.toFixed(
+						1
+					)}° | {horizonPoint.distance_km.toFixed(1)}km"
+				></div>
+			{/each}
+		</div>
+
+		<div class="x-axis">
+			<span>-45°</span>
+			<span>Peak</span>
+			<span>+45°</span>
+		</div>
+	{/if}
+
+	<div class="controls">
+		<button onclick={togglePlay} disabled={loading}>
+			{playing ? 'Pause' : 'Play'}
+		</button>
+
+		<input type="range" min="0" max="359" bind:value={currentAngle} disabled={loading} />
+
+		<span class="angle">{currentAngle}°</span>
+
+		<label>
+			Speed:
+			<input type="range" min="10" max="500" bind:value={animationSpeed} disabled={loading} />
+		</label>
+	</div>
+
+	<p class="info">8.9km from Mt Timpanogos peak</p>
+</div>
+
+<style>
+	:global(body) {
+		margin: 0;
+		background: #0a0a0f;
+		font-family: system-ui;
+		color: #fff;
+	}
+
+	.container {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
+		padding: 20px;
+		box-sizing: border-box;
+	}
+
+	h1 {
+		margin: 0;
+		text-align: center;
+		font-size: 1.5rem;
+	}
+
+	.subtitle {
+		text-align: center;
+		color: #666;
+		margin: 5px 0 20px;
+	}
+
+	.loading {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #4facfe;
+	}
+
+	.chart {
+		flex: 1;
+		display: flex;
+		align-items: flex-end;
+		gap: 1px;
+		background: #111;
+		padding: 20px;
+		border-radius: 8px;
+	}
+
+	.bar {
+		flex: 1;
+		height: var(--height);
+		background: var(--color);
+		min-height: 2px;
+	}
+
+	.x-axis {
+		display: flex;
+		justify-content: space-between;
+		padding: 10px 20px;
+		color: #666;
+		font-size: 12px;
+	}
+
+	.controls {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		gap: 20px;
+		padding: 20px;
+		background: #111;
+		border-radius: 8px;
+		margin-top: 10px;
+	}
+
+	button {
+		padding: 10px 20px;
+		background: #4facfe;
+		border: none;
+		border-radius: 5px;
+		color: #000;
+		cursor: pointer;
+		font-weight: bold;
+	}
+
+	button:hover {
+		background: #00f2fe;
+	}
+
+	button:disabled {
+		background: #333;
+		cursor: not-allowed;
+	}
+
+	input[type='range'] {
+		width: 150px;
+	}
+
+	.angle {
+		font-size: 24px;
+		font-weight: bold;
+		color: #4facfe;
+		min-width: 60px;
+	}
+
+	label {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: #888;
+	}
+
+	.info {
+		text-align: center;
+		color: #666;
+		margin: 10px 0 0;
+		font-size: 14px;
+	}
+</style>
