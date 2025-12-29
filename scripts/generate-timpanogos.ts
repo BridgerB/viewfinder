@@ -1,5 +1,4 @@
 import { loadElevationData } from '@bridgerb/horizon';
-import { gzipSync } from 'zlib';
 import { writeFileSync } from 'fs';
 
 interface Coordinate {
@@ -10,13 +9,13 @@ interface Coordinate {
 interface HorizonPoint {
 	relativeDirection: number;
 	elevationAngleDegrees: number;
-	distance_km: number;
+	distanceKm: number;
 }
 
 interface RawHorizonPoint {
 	direction: number;
 	elevationAngleDegrees: number;
-	distance_km: number;
+	distanceKm: number;
 }
 
 interface Viewpoint {
@@ -43,8 +42,7 @@ interface ElevationData {
 const PEAK: Coordinate = { latitude: 40.3908, longitude: -111.6458 };
 const DISTANCE_KM = 8.919;
 const TIF_PATH = 'data/n41w112_30m.tif';
-const OUTPUT_PATH_GZ = 'src/lib/assets/timpanogos.json.gz';
-const OUTPUT_PATH_JSON = 'src/lib/assets/timpanogos.json';
+const OUTPUT_PATH_JSON = 'static/timpanogos.json';
 const EARTH_RADIUS_KM = 6371;
 const HALF_FOV_DEGREES = 45;
 
@@ -113,7 +111,7 @@ const transformToRelativeDirection = (
 ): HorizonPoint => ({
 	relativeDirection: normalizeRelativeDirection(point.direction - Math.round(bearingToPeak)),
 	elevationAngleDegrees: point.elevationAngleDegrees,
-	distance_km: point.distance_km
+	distanceKm: point.distanceKm
 });
 
 const calculateHorizonForViewpoint = (
@@ -157,15 +155,10 @@ async function main(): Promise<void> {
 	}
 
 	const json = JSON.stringify(viewpoints);
-	const gzipped = gzipSync(json);
-
-	console.log(
-		`JSON: ${(json.length / 1024).toFixed(0)}KB → Gzip: ${(gzipped.length / 1024).toFixed(0)}KB`
-	);
+	console.log(`JSON size: ${(json.length / 1024).toFixed(0)}KB`);
 
 	writeFileSync(OUTPUT_PATH_JSON, json);
-	writeFileSync(OUTPUT_PATH_GZ, gzipped);
-	console.log(`Saved to ${OUTPUT_PATH_JSON} and ${OUTPUT_PATH_GZ}`);
+	console.log(`Saved to ${OUTPUT_PATH_JSON}`);
 }
 
 main().catch(console.error);

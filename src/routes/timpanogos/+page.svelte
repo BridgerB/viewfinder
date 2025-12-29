@@ -10,7 +10,7 @@
 	interface HorizonPoint {
 		relativeDirection: number;
 		elevationAngleDegrees: number;
-		distance_km: number;
+		distanceKm: number;
 	}
 
 	interface Viewpoint {
@@ -99,10 +99,10 @@
 					class="bar"
 					style="--height: {calculateBarHeight(
 						horizonPoint.elevationAngleDegrees
-					)}%; --color: {calculateDistanceColor(horizonPoint.distance_km)}"
+					)}%; --color: {calculateDistanceColor(horizonPoint.distanceKm)}"
 					title="{horizonPoint.relativeDirection}° | {horizonPoint.elevationAngleDegrees.toFixed(
 						1
-					)}° | {horizonPoint.distance_km.toFixed(1)}km"
+					)}° | {horizonPoint.distanceKm.toFixed(1)}km"
 				></div>
 			{/each}
 		</div>

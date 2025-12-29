@@ -33,7 +33,7 @@
 		"vite": "^7.2.6"
 	},
 	"dependencies": {
-		"@bridgerb/horizon": "^1.0.3",
+		"@bridgerb/horizon": "^2.0.0",
 		"gdal-async": "^3.12.1"
 	}
 }
