@@ -59,8 +59,8 @@
 	let viewpoints: Viewpoint[] = $state([]);
 	let currentAngle = $state(187);
 	let loading = $state(true);
-	let playing = $state(false);
-	let animationSpeed = $state(100);
+	let playing = $state(true);
+	let animationSpeed = $state(500);
 	let animationInterval: ReturnType<typeof setInterval>;
 
 	$effect(() => {
