@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { asset } from '$app/paths';
+	import viewpointsData from '$lib/assets/timpanogos.json';
 
 	interface Coordinate {
 		latitude: number;
@@ -56,9 +55,8 @@
 	const formatCoordinate = (coordinate: Coordinate): string =>
 		`${coordinate.latitude.toFixed(4)}°N, ${Math.abs(coordinate.longitude).toFixed(4)}°W`;
 
-	let viewpoints: Viewpoint[] = $state([]);
+	let viewpoints: Viewpoint[] = viewpointsData as Viewpoint[];
 	let currentAngle = $state(187);
-	let loading = $state(true);
 	let playing = $state(true);
 	let animationSpeed = $state(500);
 	let animationInterval: ReturnType<typeof setInterval>;
@@ -77,69 +75,44 @@
 	const togglePlay = (): void => {
 		playing = !playing;
 	};
-
-	onMount(async () => {
-		const response = await fetch(asset('/timpanogos.json'));
-		viewpoints = await response.json();
-		loading = false;
-	});
 </script>
 
 <div class="container">
-	{#if loading}
-		<div class="loading">Loading viewpoints...</div>
-	{:else}
-		{@const currentViewpoint = viewpoints[currentAngle]}
-		<h1>Mt Timpanogos - {currentAngle}°</h1>
-		<p class="subtitle">{formatCoordinate(currentViewpoint.viewpoint)}</p>
+	<h1>Mt Timpanogos - {currentAngle}°</h1>
+	<p class="subtitle">{formatCoordinate(viewpoints[currentAngle].viewpoint)}</p>
 
-		<div class="chart">
-			{#each currentViewpoint.horizon as horizonPoint (horizonPoint.relativeDirection)}
-				<div
-					class="bar"
-					style="--height: {calculateBarHeight(
-						horizonPoint.elevationAngleDegrees
-					)}%; --color: {calculateDistanceColor(horizonPoint.distanceKm)}"
-					title="{horizonPoint.relativeDirection}° | {horizonPoint.elevationAngleDegrees.toFixed(
-						1
-					)}° | {horizonPoint.distanceKm.toFixed(1)}km"
-				></div>
-			{/each}
-		</div>
+	<div class="chart">
+		{#each viewpoints[currentAngle].horizon as horizonPoint (horizonPoint.relativeDirection)}
+			<div
+				class="bar"
+				style="--height: {calculateBarHeight(
+					horizonPoint.elevationAngleDegrees
+				)}%; --color: {calculateDistanceColor(horizonPoint.distanceKm)}"
+				title="{horizonPoint.relativeDirection}° | {horizonPoint.elevationAngleDegrees.toFixed(
+					1
+				)}° | {horizonPoint.distanceKm.toFixed(1)}km"
+			></div>
+		{/each}
+	</div>
 
-		<div class="x-axis">
-			<span>-45°</span>
-			<span>Peak</span>
-			<span>+45°</span>
-		</div>
-	{/if}
+	<div class="x-axis">
+		<span>-45°</span>
+		<span>Peak</span>
+		<span>+45°</span>
+	</div>
 
 	<div class="controls">
-		<button onclick={togglePlay} disabled={loading}>
+		<button onclick={togglePlay}>
 			{playing ? 'Pause' : 'Play'}
 		</button>
 
-		<input
-			class="angle-slider"
-			type="range"
-			min="0"
-			max="359"
-			bind:value={currentAngle}
-			disabled={loading}
-		/>
+		<input class="angle-slider" type="range" min="0" max="359" bind:value={currentAngle} />
 
 		<span class="angle">{currentAngle}°</span>
 
 		<label class="speed-control">
 			Speed:
-			<input
-				class="speed-slider"
-				type="range"
-				min="10"
-				max="500"
-				bind:value={animationSpeed}
-				disabled={loading}
-			/>
+			<input class="speed-slider" type="range" min="10" max="500" bind:value={animationSpeed} />
 		</label>
 	</div>
 
@@ -175,14 +148,6 @@
 		color: #666;
 		margin: 0;
 		font-size: 0.85rem;
-	}
-
-	.loading {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		color: #4facfe;
 	}
 
 	.chart {
@@ -234,11 +199,6 @@
 
 	button:hover {
 		background: #00f2fe;
-	}
-
-	button:disabled {
-		background: #333;
-		cursor: not-allowed;
 	}
 
 	.angle-slider {
