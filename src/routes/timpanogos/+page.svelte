@@ -119,13 +119,27 @@
 			{playing ? 'Pause' : 'Play'}
 		</button>
 
-		<input type="range" min="0" max="359" bind:value={currentAngle} disabled={loading} />
+		<input
+			class="angle-slider"
+			type="range"
+			min="0"
+			max="359"
+			bind:value={currentAngle}
+			disabled={loading}
+		/>
 
 		<span class="angle">{currentAngle}°</span>
 
-		<label>
+		<label class="speed-control">
 			Speed:
-			<input type="range" min="10" max="500" bind:value={animationSpeed} disabled={loading} />
+			<input
+				class="speed-slider"
+				type="range"
+				min="10"
+				max="500"
+				bind:value={animationSpeed}
+				disabled={loading}
+			/>
 		</label>
 	</div>
 
@@ -143,21 +157,24 @@
 	.container {
 		display: flex;
 		flex-direction: column;
-		height: 100vh;
-		padding: 20px;
+		min-height: 100vh;
+		min-height: 100dvh;
+		padding: 12px;
 		box-sizing: border-box;
+		gap: 8px;
 	}
 
 	h1 {
 		margin: 0;
 		text-align: center;
-		font-size: 1.5rem;
+		font-size: 1.2rem;
 	}
 
 	.subtitle {
 		text-align: center;
 		color: #666;
-		margin: 5px 0 20px;
+		margin: 0;
+		font-size: 0.85rem;
 	}
 
 	.loading {
@@ -169,12 +186,12 @@
 	}
 
 	.chart {
-		flex: 1;
+		height: 40vh;
 		display: flex;
 		align-items: flex-end;
 		gap: 1px;
 		background: #111;
-		padding: 20px;
+		padding: 12px;
 		border-radius: 8px;
 	}
 
@@ -188,20 +205,20 @@
 	.x-axis {
 		display: flex;
 		justify-content: space-between;
-		padding: 10px 20px;
+		padding: 4px 12px;
 		color: #666;
-		font-size: 12px;
+		font-size: 11px;
 	}
 
 	.controls {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: center;
 		align-items: center;
-		gap: 20px;
-		padding: 20px;
+		gap: 12px;
+		padding: 12px;
 		background: #111;
 		border-radius: 8px;
-		margin-top: 10px;
 	}
 
 	button {
@@ -212,6 +229,7 @@
 		color: #000;
 		cursor: pointer;
 		font-weight: bold;
+		flex-shrink: 0;
 	}
 
 	button:hover {
@@ -223,28 +241,85 @@
 		cursor: not-allowed;
 	}
 
-	input[type='range'] {
-		width: 150px;
+	.angle-slider {
+		flex: 1;
+		min-width: 100px;
+		max-width: 200px;
 	}
 
 	.angle {
-		font-size: 24px;
+		font-size: 1.2rem;
 		font-weight: bold;
 		color: #4facfe;
-		min-width: 60px;
+		min-width: 50px;
+		text-align: center;
 	}
 
-	label {
+	.speed-control {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		color: #888;
+		font-size: 0.85rem;
+	}
+
+	.speed-slider {
+		width: 80px;
 	}
 
 	.info {
 		text-align: center;
 		color: #666;
-		margin: 10px 0 0;
-		font-size: 14px;
+		margin: 0;
+		font-size: 12px;
+	}
+
+	@media (min-width: 640px) {
+		.container {
+			padding: 20px;
+			gap: 10px;
+		}
+
+		h1 {
+			font-size: 1.5rem;
+		}
+
+		.subtitle {
+			font-size: 1rem;
+			margin-bottom: 10px;
+		}
+
+		.chart {
+			height: 60vh;
+			padding: 20px;
+		}
+
+		.x-axis {
+			padding: 10px 20px;
+			font-size: 12px;
+		}
+
+		.controls {
+			padding: 20px;
+			gap: 20px;
+		}
+
+		.angle {
+			font-size: 1.5rem;
+			min-width: 60px;
+		}
+
+		.angle-slider {
+			max-width: 150px;
+		}
+
+		.speed-slider {
+			width: 100px;
+		}
+
+		.info {
+			font-size: 14px;
+			margin-top: 5px;
+		}
 	}
 </style>
