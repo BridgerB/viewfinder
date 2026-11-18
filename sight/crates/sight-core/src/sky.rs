@@ -198,7 +198,12 @@ fn step_row(img: &Image, x: usize, r: Region) -> Option<usize> {
     let mean = |a: usize, b: usize| (prefix[b] - prefix[a]) / (b - a) as f64;
     let step = |y: usize| mean(y.saturating_sub(k), y) - mean(y, (y + k).min(h));
     let rows = edge..=h - edge;
-    let first = rows.clone().find(|&y| step(y) >= MIN_STEP)?;
+    // Land stays land: below a real ridge the next fifth of the box is still clearly darker
+    // than the sky above it. Below a dark cloud band the sky comes back, so it does not count.
+    let run = (h / 5).max(k);
+    let stays =
+        |y: usize| mean(y, (y + run).min(h)) <= mean(y.saturating_sub(k), y) - MIN_STEP / 2.0;
+    let first = rows.clone().find(|&y| step(y) >= MIN_STEP && stays(y))?;
     let row = (first..=(first + k).min(h - edge)).max_by(|&a, &b| step(a).total_cmp(&step(b)))?;
     // A "ridge" in the bottom 5% of the box is whatever the box's lower edge cut through, such
     // as tree tops; the column has no ridge the tracer can see.

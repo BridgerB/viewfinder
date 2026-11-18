@@ -1,6 +1,7 @@
 // The locator behind a Durable Object: one container running `sight serve`, started on the first
 // request and stopped after a quiet spell. Requests arrive from the site through a service
-// binding, already stripped to the locator's own paths (/health, /trace, /image/ID, /locate).
+// binding, already stripped to the locator's own paths (/health, /trace, /image/ID, /retrace,
+// /locate).
 import { DurableObject } from "cloudflare:workers";
 
 /** The port `sight serve` listens on inside the container (see Dockerfile). */
@@ -12,14 +13,26 @@ const INSTANCE = "standard-4";
 
 export class Sight extends DurableObject<Env> {
 	private starting: Promise<Container> | undefined;
+	/** Whether this instance of the object has checked that the container runs the deployed image. */
+	private checkedImage = false;
 
 	/** The container, started if it is not running, once its server answers /health. */
 	private async ready(): Promise<Container> {
 		const container = this.ctx.container;
 		if (!container) throw new Error("this Durable Object has no container");
+		const image = container.images.base;
+		if (!image) throw new Error("the container image 'base' is missing");
+		// A deploy restarts this object but not a running container, which would keep serving the
+		// old image until it idled out. So the first request after a deploy replaces it.
+		if (!this.checkedImage && container.running) {
+			const info = await container.inspect();
+			if (info && info.image !== image) {
+				await container.destroy();
+				await container.monitor().catch(() => undefined);
+			}
+		}
+		this.checkedImage = true;
 		if (!container.running) {
-			const image = container.images.base;
-			if (!image) throw new Error("the container image 'base' is missing");
 			container.start({ image, instance: INSTANCE, enableInternet: false });
 		}
 		await container.setInactivityTimeout(IDLE_MS);
