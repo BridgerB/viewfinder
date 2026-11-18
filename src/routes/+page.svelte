@@ -6,6 +6,9 @@
 
 <ul>
 	<li><a href={resolve('/timpanogos')}>Mt Timpanogos 360° Horizon</a></li>
+	<li><a href={resolve('/timpanogos/match')}>Photo match</a></li>
+	<li><a href={resolve('/sandy/match')}>Sandy photo match</a></li>
+	<li><a href={resolve('/results')}>All test photos on a map</a></li>
 </ul>
 
 <style>

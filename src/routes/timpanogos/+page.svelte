@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import viewpointsData from '$lib/assets/timpanogos.json';
 
 	interface Coordinate {
@@ -116,7 +117,9 @@
 		</label>
 	</div>
 
-	<p class="info">8.9km from Mt Timpanogos peak</p>
+	<p class="info">
+		8.9km from Mt Timpanogos peak · <a href={resolve('/timpanogos/match')}>Photo match</a>
+	</p>
 </div>
 
 <style>
@@ -232,6 +235,10 @@
 		color: #666;
 		margin: 0;
 		font-size: 12px;
+	}
+
+	.info a {
+		color: #4facfe;
 	}
 
 	@media (min-width: 640px) {
