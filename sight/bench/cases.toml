@@ -1,0 +1,63 @@
+# Photographs whose camera position is known, for timing the search and checking it still
+# finds them. Paths are relative to the repository root. Images and skylines under data/ are
+# gitignored; the Wikimedia ones are listed with their sources in static/results/LICENSE.md.
+# No skyline means the tracer runs on the photograph; no fov means the lens is unknown.
+# baseline_km is the search's error when this bench was set up.
+
+[[case]]
+id = "timpanogos"
+image = "static/mount-timpanogos.jpg"
+truth = [40.311187, -111.658619]
+baseline_km = 0.15
+quick = true
+
+[[case]]
+id = "sandy"
+image = "static/sandy.jpg"
+truth = [40.569606, -111.812453]
+baseline_km = 0.22
+quick = true
+
+[[case]]
+id = "little-cottonwood"
+image = "data/bench/photos/86.jpg"
+skyline = "data/bench/skylines/s86.json"
+truth = [40.57959, -111.79143]
+baseline_km = 0.12
+quick = true
+
+[[case]]
+id = "library"
+image = "data/bench/photos/00.jpg"
+skyline = "data/bench/skylines/s00.json"
+truth = [40.76017, -111.8847]
+baseline_km = 0.35
+
+[[case]]
+id = "capitol-hazy"
+image = "data/bench/photos/04.jpg"
+skyline = "data/bench/skylines/s04.json"
+truth = [40.77713, -111.88786]
+baseline_km = 0.43
+
+[[case]]
+id = "capitol-cloudy"
+image = "data/bench/photos/05.jpg"
+skyline = "data/bench/skylines/s05.json"
+truth = [40.77674, -111.88854]
+baseline_km = 2.56
+
+[[case]]
+id = "red-butte"
+image = "data/bench/photos/117.jpg"
+skyline = "data/bench/skylines/s117.json"
+truth = [40.76288, -111.82008]
+baseline_km = 0.70
+
+[[case]]
+id = "daybreak"
+image = "data/bench/photos/21.jpg"
+skyline = "data/bench/skylines/s21.json"
+fov = 26.7
+truth = [40.55505, -112.00346]
+baseline_km = 1.54

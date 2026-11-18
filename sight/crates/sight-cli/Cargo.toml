@@ -1,0 +1,22 @@
+[package]
+name = "sight-cli"
+description = "The `sight` command: build horizon fields, locate photographs, bench and profile."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sight"
+path = "src/main.rs"
+
+[dependencies]
+sight-core.workspace = true
+sight-io.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rayon.workspace = true
+
+[lints]
+workspace = true

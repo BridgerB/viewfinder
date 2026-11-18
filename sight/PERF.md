@@ -71,3 +71,29 @@ The latest CPU profile of the coarse stage: `slide-yaw` (with `dot` inlined) ~61
 - A long-lived process (REPL or small server) holding the DEM, fields and a warm JIT: a query is then the ~5 s warm path, not ~12 s cold.
 - Prune tilt templates per place: try the middle tilt first, then neighbours of the best.
 - Baseline bench of the old code (`git stash` or the efca147 tree) for an exact before table; ~9 min per photo, so run it unattended.
+
+## Rust port (sight/crates)
+
+The search was rewritten in Rust (`sight-core` pure, `sight-io` files, `sight-cli` the `sight` binary). Run from the repository root: `sight/target/release/sight bench data/elevation/envi/n41w112 data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn sight/bench/cases.toml`.
+
+Parity with the Clojure version:
+
+- Horizon fields built by Rust are identical to the Clojure files: 2352 places / 846,720 values and 29,669 places / 10,680,840 values, 0 differing angles or distances (`sight compare-fields`).
+- The full search matches the golden answer on all 60 places to 1.9e-13 when both read the same skyline (`sight golden … --skyline`).
+- JPEG decoding is the one input difference: Rust's `image` crate and Java's ImageIO disagree on 196 of 3438 traced Sandy columns, by up to 32 px (`sight compare-trace`). Photos with a guided skyline are unaffected.
+- The bench gives the same error, true-area rank and screen rank as the last Clojure run on all 8 photos.
+
+Speed, measured step by step:
+
+| Step | 32k-place ranking workload (`sight profile --places 32000`) | Bench, seconds per photo |
+|---|---|---|
+| Straight port, scalar f64 | 2.46–3.04 s | 2.3–4.8 |
+| `dot` with 8 independent f64 FMA lanes | 1.52–1.74 s | |
+| Skip the relief `ln` when a window cannot win | 1.38–1.62 s | 1.2–2.4 |
+| `dot32`: f32 lanes, summed to f64 | 1.27–1.52 s | same accuracy (Daybreak rank 117 → 115) |
+
+Microbenchmark (`cargo bench -p sight-core`), 360 windows single-threaded: f64 `dot` 5.54 µs at a 70° template and 8.83 µs at 115°; f32 `dot32` 3.56 µs and 4.04 µs.
+
+Loading the DEM (memory-mapped, zero-copy) and both fields takes 0.02 s, against ~0.4 s on the JVM. Building the rugged field takes 10.7 s (Clojure 14 s): the horizon walk is bound by random reads across the 234 MB grid, so the language matters little there.
+
+The machine was heavily loaded by other work during the later runs (load average 48–84 on 10 cores), so seconds after the f32 step are noisy; the microbenchmark is the clean comparison.

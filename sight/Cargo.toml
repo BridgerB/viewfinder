@@ -1,0 +1,40 @@
+[workspace]
+members = ["crates/sight-core", "crates/sight-io", "crates/sight-cli"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Unlicense"
+
+[workspace.dependencies]
+sight-core = { path = "crates/sight-core" }
+sight-io = { path = "crates/sight-io" }
+rayon = "1.10"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+memmap2 = "0.9"
+bytemuck = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+regex = "1"
+toml = "0.8"
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+proptest = "1"
+divan = "0.1"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+wildcard_enum_match_arm = "deny"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = "line-tables-only"
+
+[profile.bench]
+inherits = "release"
