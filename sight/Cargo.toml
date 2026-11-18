@@ -23,6 +23,8 @@ clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 proptest = "1"
 divan = "0.1"
+tiny_http = "0.12"
+kamadak-exif = "0.6"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

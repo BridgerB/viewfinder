@@ -29,6 +29,8 @@ use sight_core::search::{self, Found, Stage, Timer};
 use sight_core::sky;
 use sight_io::LoadedDem;
 
+mod serve;
+
 #[derive(Parser)]
 #[command(name = "sight", about = "Where was this mountain photograph taken?")]
 struct Cli {
@@ -131,6 +133,17 @@ enum Cmd {
     },
     /// Column-by-column comparison of the traced skyline with a skyline file.
     CompareTrace { image: PathBuf, skyline: PathBuf },
+    /// The locator as a local HTTP API for the site's upload page: POST /trace, GET /image/ID,
+    /// POST /locate. Keeps the grid and fields in memory.
+    Serve {
+        grid: PathBuf,
+        /// Comma-separated horizon fields.
+        fields: String,
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(long, default_value_t = 4373)]
+        port: u16,
+    },
 }
 
 fn main() -> Result<()> {
@@ -213,6 +226,12 @@ fn main() -> Result<()> {
             skyline,
         } => golden(&grid, &field, &image, &answer, skyline.as_deref()),
         Cmd::CompareTrace { image, skyline } => compare_trace(&image, &skyline),
+        Cmd::Serve {
+            grid,
+            fields,
+            host,
+            port,
+        } => serve::serve(&grid, &fields, &host, port),
     }
 }
 

@@ -40,6 +40,8 @@ pub enum IoError {
         path: PathBuf,
         source: image::ImageError,
     },
+    #[error("photo: {0}")]
+    Photo(image::ImageError),
     #[error("{path}: {source}")]
     Toml {
         path: PathBuf,
@@ -154,6 +156,19 @@ pub fn read_fields(list: &str) -> Result<Vec<Field>, IoError> {
     list.split(',').map(|p| read_field(Path::new(p))).collect()
 }
 
+fn argb_of(img: &image::RgbImage) -> Image {
+    let (width, height) = (img.width() as usize, img.height() as usize);
+    let argb = img
+        .pixels()
+        .map(|p| 0xff00_0000 | (u32::from(p[0]) << 16) | (u32::from(p[1]) << 8) | u32::from(p[2]))
+        .collect();
+    Image {
+        width,
+        height,
+        argb,
+    }
+}
+
 /// A JPEG or PNG decoded to ARGB.
 pub fn read_image(path: &Path) -> Result<Image, IoError> {
     let img = image::open(path)
@@ -162,16 +177,54 @@ pub fn read_image(path: &Path) -> Result<Image, IoError> {
             source,
         })?
         .to_rgb8();
-    let (width, height) = (img.width() as usize, img.height() as usize);
-    let argb = img
-        .pixels()
-        .map(|p| 0xff00_0000 | (u32::from(p[0]) << 16) | (u32::from(p[1]) << 8) | u32::from(p[2]))
-        .collect();
-    Ok(Image {
-        width,
-        height,
-        argb,
+    Ok(argb_of(&img))
+}
+
+/// A photograph decoded from uploaded bytes.
+pub struct Decoded {
+    /// Pixels turned upright by the EXIF orientation, for tracing.
+    pub image: Image,
+    /// The same upright picture as a JPEG, so a page draws skylines in the same coordinates.
+    pub jpeg: Vec<u8>,
+    /// Horizontal field of view in degrees, when EXIF gives the 35 mm-equivalent focal length.
+    pub fov: Option<f64>,
+}
+
+/// Decodes a JPEG or PNG, applies its EXIF orientation (phones store many photos sideways and
+/// let the viewer rotate them), and reads the lens from EXIF.
+pub fn decode_photo(bytes: &[u8]) -> Result<Decoded, IoError> {
+    use image::ImageDecoder as _;
+    let reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|e| IoError::Photo(image::ImageError::IoError(e)))?;
+    let mut decoder = reader.into_decoder().map_err(IoError::Photo)?;
+    let orientation = decoder.orientation().map_err(IoError::Photo)?;
+    let mut img = image::DynamicImage::from_decoder(decoder).map_err(IoError::Photo)?;
+    img.apply_orientation(orientation);
+    let rgb = img.to_rgb8();
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 88)
+        .encode_image(&rgb)
+        .map_err(IoError::Photo)?;
+    Ok(Decoded {
+        image: argb_of(&rgb),
+        jpeg,
+        fov: exif_fov(bytes),
     })
+}
+
+/// Horizontal field of view from EXIF `FocalLengthIn35mmFilm` (JPEG or HEIF): 2·atan(18 / f),
+/// half of a 36 mm frame over the focal length.
+#[must_use]
+pub fn exif_fov(bytes: &[u8]) -> Option<f64> {
+    let exif = exif::Reader::new()
+        .read_from_container(&mut std::io::Cursor::new(bytes))
+        .ok()?;
+    let focal = exif
+        .get_field(exif::Tag::FocalLengthIn35mmFilm, exif::In::PRIMARY)?
+        .value
+        .get_uint(0)?;
+    (focal > 0).then(|| 2.0 * (18.0 / f64::from(focal)).atan().to_degrees())
 }
 
 /// Skyline pixels from any file of `[x, y]` pairs (a hand-guided skyline, or a page's JSON).

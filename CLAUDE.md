@@ -46,6 +46,7 @@ sight/target/release/sight search  GRID FIELDS IMAGE SURFACE.json MATCH.json [--
 sight/target/release/sight around  GRID IMAGE LAT LON [--skyline] [--fov] [--step 125] [--reach 1000]   # diagnostic
 sight/target/release/sight ridges  GRID CAMERAS.txt OUT.json   # ridge points for "id lat lon yaw fov" lines
 sight/target/release/sight trace   IMAGE
+sight/target/release/sight serve   GRID FIELDS [--host 0.0.0.0] [--port 4373]   # HTTP API for /locate (pnpm sight)
 ```
 
 `--skyline` replaces the tracer with hand-traced `[x, y]` pixel pairs; `--fov` pins the lens from EXIF (35 mm-equivalent f → 2·atan(18/f)). The tracer takes the first non-sky row per column, so trees, poles and roofs in front of the ridge break it; use `--skyline` for such photos.
@@ -89,6 +90,7 @@ Routes:
 - `/timpanogos/match` — photo with traced skyline and the model horizon overlaid, per-ring-angle shape match, elevation-angle profile, and the search heatmap.
 - `/sandy/match` — a second photo: traced skyline + search heatmap only.
 - `/results` — every bench photo on a map, one at a time: true spot, guess, and the view wedge out to the ridge the skyline sits on.
+- `/locate` — upload any photo (JPEG, PNG, or HEIC via macOS `sips`), see the traced skyline, redraw it by clicking along the ridge if it is wrong, and search. The page calls `sight serve` on port 4373 of the same host (`pnpm sight`; build it once with `pnpm sight:build`), which keeps the grid and fields in memory and holds the last 8 uploads. It only works locally: the search needs ~300 MB resident and a Cloudflare Worker has 128 MB, so a hosted version needs the same server in a container. The result shows a verdict that also checks whether the top 5 candidates agree, because a smooth skyline can fit many places with a low loss.
 
 `src/lib/photo-match.ts` holds all the pure logic for the match pages (camera projection/unprojection that mirrors the locator's `ray`, SVG point strings, heat weighting). `src/lib/MatchMap.svelte` and `src/lib/ResultsMap.svelte` are Leaflet maps; Leaflet is imported dynamically inside an action because it needs `window`, and `leaflet.heat` needs `L` on `globalThis` first (`src/lib/leaflet-heat.d.ts` declares it, since it ships no types).
 

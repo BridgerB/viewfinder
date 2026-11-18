@@ -9,6 +9,7 @@ import { resolve } from "$app/paths";
 	<li><a href={resolve('/timpanogos/match')}>Photo match</a></li>
 	<li><a href={resolve('/sandy/match')}>Sandy photo match</a></li>
 	<li><a href={resolve('/results')}>All test photos on a map</a></li>
+	<li><a href={resolve('/locate')}>Locate your own photo</a></li>
 </ul>
 
 <style>
