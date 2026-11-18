@@ -28,7 +28,7 @@ sourceRefs:
 ## sourceRefs
 
 - `path#anchor`, path from the repository root.
-- The anchor is text the file actually says: a declaration (`pub fn dot32(`), a constant line (`near_weight: 0.0,`), or a phrase from a doc comment or log. Never a line number: line numbers move with every edit, text moves only when its meaning does.
+- The anchor is text the file actually says: a declaration (`pub fn cross_all(`), a constant line (`near_weight: 0.0,`), or a phrase from a doc comment or log. Never a line number: line numbers move with every edit, text moves only when its meaning does.
 - Matching ignores markdown and code punctuation `* _ ` #` and runs of whitespace, so an anchor survives reformatting.
 - The anchor must match exactly one place in the file. If it matches two, lengthen it.
 

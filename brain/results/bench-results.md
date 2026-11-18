@@ -4,6 +4,7 @@ status: verified
 verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - data/bench/runs/rust-1794987848.json#"at": "1794987848",
+  - data/bench/runs/rust-1794989831.json#"at": "1794989831",
   - sight/bench/cases.toml#id = "capitol-cloudy"
   - sight/PERF.md#Every case is at or better than baseline error. A search is ~110× faster.
 ---
@@ -28,6 +29,8 @@ Reading it:
 - Six of eight are solved (truth rank 1, under 1 km).
 - **Capitol, cloudy**: the screen keeps the true area (rank 2) but the full search prefers a place 2.56 km away. The two Capitol photos are taken ~70 m apart; the hazy one is solved, so the cloudy photo's skyline is the difference. Not yet diagnosed.
 - **Daybreak**: the true spot is off the tile ([[gotchas/tile-edge]]) and the lens is a telephoto; no screen row lands within 1 km.
-- Timings: the coarse stage is 1.2–1.9 s and dominates; refinement 0.75–1.2 s. On an idle machine earlier runs gave 1.2–2.4 s per photo.
+- Timings in this run: the coarse stage is 1.2–1.9 s and dominates; refinement 0.75–1.2 s.
 
-History: Clojure baseline ~540 s per photo at efca147; Clojure two-pass ~5 s; Rust 1.2–2.4 s. Method and logs: [[locator/tools/bench]].
+**After the screen sweep** (`data/bench/runs/rust-1794989831.json`, load average ~20): every error and truth rank is identical, and capitol-cloudy's screen rank improves 2 → 1. Coarse stage 0.75–1.03 s, whole search 1.5–2.2 s per photo (Daybreak, with a known lens, 1.1 s). Refinement (~0.75–1.2 s) is now as large as the coarse stage.
+
+History: Clojure baseline ~540 s per photo at efca147; Clojure two-pass ~5 s; Rust 1.2–2.4 s; with the screen sweep 1.5–2.2 s under heavy load. Method and logs: [[locator/tools/bench]].

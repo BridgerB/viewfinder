@@ -475,6 +475,25 @@ fn profile(grid: &Path, fields: &str, image: &Path, skyline: Option<&Path>, plac
         times,
         rayon::current_num_threads()
     );
+    // The same work split into its two passes, so each can be timed on its own.
+    let (mut screen_s, mut full_s) = (0.0, 0.0);
+    for _ in 0..reps {
+        for part in &parts {
+            let t = Instant::now();
+            let screened = sight_core::screen::screen(part, &dem, &prep.templates, &cfg.score, &cfg.screen);
+            screen_s += t.elapsed().as_secs_f64();
+            let t = Instant::now();
+            let keep = cfg.screen.keep_min.max((cfg.screen.keep_share * part.len() as f64) as usize);
+            let chosen = &screened[..keep.min(screened.len())];
+            let sub = part.subset(&chosen.iter().map(|r| r.index).collect::<Vec<_>>());
+            let yaws: Vec<Vec<u16>> =
+                chosen.iter().map(|r| sight_core::score::yaws_around(r.yaw, cfg.screen.reach)).collect();
+            let _ = sight_core::score::surface(&sub, &dem, &prep.lenses, sight_core::score::Yaws::PerPlace(&yaws), &cfg.score);
+            full_s += t.elapsed().as_secs_f64();
+        }
+    }
+    let n = reps.max(1) as f64;
+    println!("per rep: screen {:.3} s, full search on survivors {:.3} s", screen_s / n, full_s / n);
     Ok(())
 }
 

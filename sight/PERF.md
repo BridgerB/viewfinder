@@ -97,3 +97,36 @@ Microbenchmark (`cargo bench -p sight-core`), 360 windows single-threaded: f64 `
 Loading the DEM (memory-mapped, zero-copy) and both fields takes 0.02 s, against ~0.4 s on the JVM. Building the rugged field takes 10.7 s (Clojure 14 s): the horizon walk is bound by random reads across the 234 MB grid, so the language matters little there.
 
 The machine was heavily loaded by other work during the later runs (load average 48–84 on 10 cores), so seconds after the f32 step are noisy; the microbenchmark is the clean comparison.
+
+## Faster coarse stage (screen sweep)
+
+`sight profile` now also times the two passes on their own. Before this work, on the 32k-place workload: screen 0.97 s, full search on the 3% survivors 0.28 s. A CPU sample put ~70% of all time in the screen's per-window function. The divan bench `screen_64_places` (the whole screen, one thread, 64 synthetic places) measures it cleanly: 12.97 ms.
+
+The dot product was not the main cost. At ~10 ns of ~20–45 ns per window, the rest was the window algebra: about a dozen f64 divisions and four square roots. Steps, each measured with `screen_64_places`:
+
+| Step | ms |
+|---|---|
+| Start | 12.97 |
+| Per-template reciprocals (1/m, 1/Sxx, Sxx/m, k̄, cov(g,k)), templates padded to whole lanes, a squared compare instead of a square root for losing windows | 10.32 |
+| Lower bound on the loss from cross-term-free quantities (fit ≥ \|σh − σt\|, shape ≥ 0) to skip the dot: no gain (10.27 without it), removed | — |
+| `dot32` folds its 16 lanes in f32 down to 4 before widening | 9.03 |
+| 8 lanes instead of 16: same (9.10); `#[inline(always)]`: same (9.10) | — |
+| **Sweep**: every whole yaw per template in three loops: all 360 cross terms with the template index outermost, the window algebra branch-free over 360 starts, the logarithm only for windows that can still win | 10.08 |
+| Cross terms in register tiles of 40 window starts (`cross_all`: 2.27 → 0.81 µs at 70°) | 7.84 |
+| Relief from ½·ln(vh/vt): one square root fewer | 7.70 |
+
+The sweep scores all 360 yaws, not every fov/25-th degree plus a refinement, so `yaw_span` is gone and the screen's best window is now exact over whole yaws. Its cross terms use the template and horizon minus their means, which keeps the f32 sums near the size of the covariance. A test checks every template's best against a direct f64 evaluation of all 360 windows.
+
+The full search's trim cutoff (the (keep − 1)-th smallest deviation, about the 4th largest) now comes from a few-slot running buffer instead of a second quickselect: same value (golden 60/60, 1.9e-13), survivors 0.30 → 0.24 s.
+
+Results (load average 17–21):
+
+| | Before | After |
+|---|---|---|
+| `profile --places 32000`: screen | 0.97 s | 0.63 s |
+| `profile --places 32000`: full search on survivors | 0.28–0.30 s | 0.24 s |
+| `profile --places 32000`: total | 1.27–1.35 s | 0.75–0.84 s |
+| Bench, coarse stage per photo | 1.18–1.96 s | 0.75–1.03 s |
+| Bench, whole search per photo | 2.0–3.2 s | 1.5–2.2 s |
+
+Every bench photo has the same error and truth rank, and every screen rank is the same or better (capitol-cloudy 2 → 1).

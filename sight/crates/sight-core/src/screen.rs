@@ -1,8 +1,13 @@
 //! The screen: a cheap score for every place so only the likely ones get the full search. Per
 //! lens and tilt the photograph's skyline becomes a template sampled once per whole degree; it
-//! slides around the place's horizon, and each window's error, correlation and relief come from
-//! running sums plus one multiply-add pass. A capped straight-line fit to the residual absorbs a
+//! is swept around the place's horizon, and each window's error, correlation and relief come
+//! from running sums plus one cross term. A capped straight-line fit to the residual absorbs a
 //! small roll.
+//!
+//! A sweep scores every whole yaw, in three loops shaped for the vector units: the cross terms
+//! of all 360 windows with the template index outermost (so the inner loop runs along the
+//! horizon and needs no per-window reduction), the window algebra for all 360 windows without
+//! branches, and last the logarithm of the relief term, only for windows that can still win.
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -21,28 +26,39 @@ pub struct Template {
     pub fov: f64,
     pub start: i64,
     pub elevs: Vec<f64>,
-    /// The same elevations as f32, for the cross-term kernel.
-    elevs32: Vec<f32>,
+    /// `elevs` minus their mean, as f32: the cross-term weights. Centred weights keep the f32
+    /// sums near the size of the covariance they feed, not of the raw elevations.
+    centered: Vec<f32>,
+    /// `start` wrapped into [0, 360): the window of yaw y starts at (y + rot) mod 360.
+    rot: usize,
     // Constants of the window algebra, computed once.
     g1: f64,
     g2: f64,
     gk: f64,
-    k1: f64,
     sxx: f64,
     mg: f64,
     vg: f64,
     gsigma: f64,
     lens_scale: f64,
-    step: usize,
+    /// 1/m.
+    inv_m: f64,
+    /// Mean column index, (m − 1)/2.
+    kbar: f64,
+    /// cov(g, k): how the template leans across the window.
+    cgk: f64,
+    /// Sxx/m.
+    sxx_m: f64,
+    /// 1/Sxx, or 0 for a window too short to fit a line (no tilt).
+    inv_sxx: f64,
 }
 
 impl Template {
     #[must_use]
-    pub fn new(photo: &Photo, fov: f64, pitch: f64, score: &ScoreConfig, screen: &ScreenConfig) -> Self {
+    pub fn new(photo: &Photo, fov: f64, pitch: f64, score: &ScoreConfig) -> Self {
         let cam = Camera::new(photo, fov, 0.0, pitch);
         let (offsets, geoms) = (&cam.offsets, &cam.elevs);
         let n = offsets.len();
-        // Fewer than two columns cannot be interpolated: an empty template, which slide rejects.
+        // Fewer than two columns cannot be interpolated: an empty template, which sweep rejects.
         let (start, end) = if n < 2 { (0, -1) } else { (offsets[0].ceil() as i64, offsets[n - 1].floor() as i64) };
         let m = (end - start + 1).max(0) as usize;
         let last_pair = n.saturating_sub(2);
@@ -67,21 +83,26 @@ impl Template {
         let sxx = k2 - (k1 * k1) / mf;
         let mg = g1 / mf;
         let vg = (g2 / mf - mg * mg).max(0.0);
+        let kbar = k1 / mf;
         Self {
             fov,
             start,
-            elevs32: elevs.iter().map(|&v| v as f32).collect(),
+            centered: elevs.iter().map(|&v| (v - mg) as f32).collect(),
+            rot: start.rem_euclid(AZIMUTHS as i64) as usize,
             elevs,
             g1,
             g2,
             gk,
-            k1,
             sxx,
             mg,
             vg,
             gsigma: vg.sqrt(),
             lens_scale: score.ref_fov / fov,
-            step: 1.max((fov as i64 / screen.yaw_span) as usize),
+            inv_m: 1.0 / mf,
+            kbar,
+            cgk: gk / mf - mg * kbar,
+            sxx_m: sxx / mf,
+            inv_sxx: if sxx > 0.0 { 1.0 / sxx } else { 0.0 },
         }
     }
 }
@@ -94,7 +115,7 @@ pub fn templates(photo: &Photo, score: &ScoreConfig, screen: &ScreenConfig) -> V
         if score.fovs.len() <= 3 { score.fovs.clone() } else { score.fovs.iter().step_by(2).copied().collect() };
     fovs.iter()
         .flat_map(|&fov| screen.pitches.iter().map(move |&p| (fov, p)))
-        .map(|(fov, pitch)| Template::new(photo, fov, pitch, score, screen))
+        .map(|(fov, pitch)| Template::new(photo, fov, pitch, score))
         .collect()
 }
 
@@ -103,7 +124,9 @@ pub fn templates(photo: &Photo, score: &ScoreConfig, screen: &ScreenConfig) -> V
 #[derive(Clone, Debug)]
 pub struct Sums {
     e: Vec<f64>,
-    e32: Vec<f32>,
+    /// `e` minus the place's mean horizon, as f32, for the cross terms. Missing degrees are 0
+    /// here; a window over one is rejected by `pn` before its cross term is used.
+    ec: Vec<f32>,
     p0: Vec<f64>,
     p2: Vec<f64>,
     pj: Vec<f64>,
@@ -114,7 +137,7 @@ impl Default for Sums {
     fn default() -> Self {
         Self {
             e: vec![0.0; 2 * AZIMUTHS],
-            e32: vec![0.0; 2 * AZIMUTHS],
+            ec: vec![0.0; 2 * AZIMUTHS],
             p0: vec![0.0; 2 * AZIMUTHS + 1],
             p2: vec![0.0; 2 * AZIMUTHS + 1],
             pj: vec![0.0; 2 * AZIMUTHS + 1],
@@ -126,12 +149,20 @@ impl Default for Sums {
 impl Sums {
     /// Fills from `angles`; a missing degree is 0 in the value sums and 1 in the missing count.
     pub fn fill(&mut self, angles: &[i16]) {
+        let (mut total, mut present) = (0.0, 0.0);
+        for &c in &angles[..AZIMUTHS] {
+            if c != MISSING {
+                total += f64::from(c) / CENTI;
+                present += 1.0;
+            }
+        }
+        let mean = if present > 0.0 { total / present } else { 0.0 };
         for j in 0..2 * AZIMUTHS {
             let c = angles[j % AZIMUTHS];
             let gone = c == MISSING;
             let v = if gone { 0.0 } else { f64::from(c) / CENTI };
             self.e[j] = v;
-            self.e32[j] = v as f32;
+            self.ec[j] = if gone { 0.0 } else { (v - mean) as f32 };
             self.p0[j + 1] = self.p0[j] + v;
             self.p2[j + 1] = self.p2[j] + v * v;
             self.pj[j + 1] = self.pj[j] + j as f64 * v;
@@ -140,9 +171,8 @@ impl Sums {
     }
 }
 
-/// Σ g[k]·e[b+k]: most of the screen's time. Eight independent running sums over fixed-size
-/// chunks, so LLVM keeps them in vector registers and issues fused multiply-adds side by side
-/// instead of waiting on one sum. The order differs from a plain sum only in rounding.
+/// Σ g[k]·e[b+k] for one window, in f64 with eight independent running sums: the reference the
+/// sweep's cross terms are checked against.
 #[inline]
 #[must_use]
 pub fn dot(g: &[f64], e: &[f64], b: usize) -> f64 {
@@ -163,100 +193,120 @@ pub fn dot(g: &[f64], e: &[f64], b: usize) -> f64 {
     sum
 }
 
-/// Σ g[k]·e[b+k] in f32: sixteen lanes, four per NEON register, summed to f64 at the end.
+/// Window starts per register tile of `cross_all`: ten 4-lane registers, and 360 = 9 × 40.
+const TILE: usize = 40;
+
+/// Σ g[k]·e[b+k] for every window start b in 0..360, into `out`. Each tile of 40 window starts
+/// keeps its sums in registers for the whole template, so a template value costs ten vector
+/// loads and ten fused multiply-adds, with no loads or stores of the sums in between.
 #[inline]
-#[must_use]
-pub fn dot32(g: &[f32], e: &[f32], b: usize) -> f64 {
-    const LANES: usize = 16;
-    let e = &e[b..b + g.len()];
-    let mut acc = [0.0_f32; LANES];
-    let (gc, gt) = g.as_chunks::<LANES>();
-    let (ec, et) = e.as_chunks::<LANES>();
-    for (gs, es) in gc.iter().zip(ec) {
-        for i in 0..LANES {
-            acc[i] = gs[i].mul_add(es[i], acc[i]);
+pub fn cross_all(g: &[f32], e: &[f32], out: &mut [f32; AZIMUTHS]) {
+    for (t, tile) in out.as_chunks_mut::<TILE>().0.iter_mut().enumerate() {
+        let b0 = t * TILE;
+        let mut acc = [0.0_f32; TILE];
+        for (k, &w) in g.iter().enumerate() {
+            let row: &[f32; TILE] = &e[b0 + k..b0 + k + TILE].as_chunks::<TILE>().0[0];
+            for i in 0..TILE {
+                acc[i] = w.mul_add(row[i], acc[i]);
+            }
         }
+        *tile = acc;
     }
-    let mut sum: f64 = acc.iter().map(|&v| f64::from(v)).sum();
-    for (x, y) in gt.iter().zip(et) {
-        sum += f64::from(*x) * f64::from(*y);
-    }
-    sum
 }
 
-/// The screen loss of `tpl` at `yaw` when it beats `best`; `None` when it cannot, or its window
-/// touches a missing degree. The relief term is never negative, so once the rest of the loss
-/// reaches `best` its logarithm is skipped: the answer is the same, without the cost.
-#[inline]
-fn slide_yaw(
+/// Per-thread buffers for one sweep, indexed by window start.
+struct Sweep {
+    cross: [f32; AZIMUTHS],
+    /// fit + shape + drop, or infinity for a window over a missing degree.
+    partial: [f64; AZIMUTHS],
+    /// Variance of the horizon and of the tilted template, for the relief term.
+    vh: [f64; AZIMUTHS],
+    vt: [f64; AZIMUTHS],
+    /// The drop penalty of the yaw whose window starts here.
+    drop: [f64; AZIMUTHS],
+}
+
+impl Default for Sweep {
+    fn default() -> Self {
+        Self {
+            cross: [0.0; AZIMUTHS],
+            partial: [0.0; AZIMUTHS],
+            vh: [0.0; AZIMUTHS],
+            vt: [0.0; AZIMUTHS],
+            drop: [0.0; AZIMUTHS],
+        }
+    }
+}
+
+/// The first and last 360 values of a prefix array for windows of length `m`.
+fn span(p: &[f64], m: usize) -> (&[f64], &[f64]) {
+    (&p[..AZIMUTHS], &p[m..m + AZIMUTHS])
+}
+
+/// The best (loss, yaw) of one template at one place over every whole yaw, ties to the lowest
+/// yaw. `drops` is the drop penalty per yaw. `None` when the template is too short or flat, or
+/// no window fits.
+fn sweep(
     s: &Sums,
     tpl: &Template,
-    falls: &[f64],
-    yaw: usize,
+    drops: &[f64; AZIMUTHS],
     tilt_cap: f64,
-    score: &ScoreConfig,
-    best: f64,
-) -> Option<f64> {
+    min_relief: f64,
+    w: &mut Sweep,
+) -> Option<(f64, usize)> {
     let m = tpl.elevs.len();
-    let mf = m as f64;
-    let b = (yaw as i64 + tpl.start + 720).rem_euclid(AZIMUTHS as i64) as usize;
-    let end = b + m;
-    if s.pn[end] - s.pn[b] != 0.0 {
+    if m < 8 || tpl.gsigma < min_relief {
         return None;
     }
-    let s1 = s.p0[end] - s.p0[b];
-    let s2 = s.p2[end] - s.p2[b];
-    let sk = (s.pj[end] - s.pj[b]) - b as f64 * s1;
-    let cross = dot32(&tpl.elevs32, &s.e32, b);
-    let sr = s1 - tpl.g1;
-    let srr = (s2 - 2.0 * cross) + tpl.g2;
-    let skr = sk - tpl.gk;
-    let sxr = skr - (tpl.k1 * sr) / mf;
-    // The tilt a small roll puts on the skyline, fitted to the residual and capped, then applied
-    // to the photograph's skyline for every term.
-    let tilt = if tpl.sxx > 0.0 { (-tilt_cap).max(tilt_cap.min(sxr / tpl.sxx)) } else { 0.0 };
-    let rss = (srr - (sr * sr) / mf) + -2.0 * tilt * sxr + tilt * tilt * tpl.sxx;
-    let mse = (rss / mf).max(0.0);
-    let mh = s1 / mf;
-    let vh = (s2 / mf - mh * mh).max(0.0);
-    let kbar = tpl.k1 / mf;
-    let cgk = tpl.gk / mf - tpl.mg * kbar;
-    let chk = sk / mf - mh * kbar;
-    let vt = (tpl.vg + tilt * tilt * (tpl.sxx / mf) + 2.0 * tilt * cgk).max(0.0);
-    let denom = (vt * vh).sqrt();
-    let corr = if denom < 1.0e-9 { 0.0 } else { ((cross / mf - mh * tpl.mg) + tilt * chk) / denom };
-    let fit = mse.sqrt() * tpl.lens_scale;
-    let shape = 2.0 * (1.0 - corr);
-    let drop = drop_penalty(falls[yaw], score);
-    if fit + shape + drop >= best {
-        return None;
+    cross_all(&tpl.centered, &s.ec, &mut w.cross);
+    // The window starting at b belongs to yaw (b − rot) mod 360.
+    let rot = tpl.rot;
+    w.drop[rot..].copy_from_slice(&drops[..AZIMUTHS - rot]);
+    w.drop[..rot].copy_from_slice(&drops[AZIMUTHS - rot..]);
+    // Window b spans [b, b + m): each prefix array is sliced once at both ends to exactly 360
+    // values, so the loop below has no bounds checks and vectorises.
+    let span = |p| span(p, m);
+    let ((p0a, p0z), (p2a, p2z), (pja, pjz), (pna, pnz)) = (span(&s.p0), span(&s.p2), span(&s.pj), span(&s.pn));
+    for b in 0..AZIMUTHS {
+        let s1 = p0z[b] - p0a[b];
+        let s2 = p2z[b] - p2a[b];
+        let sk = (pjz[b] - pja[b]) - b as f64 * s1;
+        let sr = s1 - tpl.g1;
+        let sxr = (sk - tpl.gk) - tpl.kbar * sr;
+        // The tilt a small roll puts on the skyline, fitted to the residual and capped, then
+        // applied to the photograph's skyline for every term.
+        let tilt = (-tilt_cap).max(tilt_cap.min(sxr * tpl.inv_sxx));
+        let mh = s1 * tpl.inv_m;
+        let vh = (s2 * tpl.inv_m - mh * mh).max(0.0);
+        let vt = (tpl.vg + tilt * tilt * tpl.sxx_m + 2.0 * tilt * tpl.cgk).max(0.0);
+        // Centred: Σ (g − ḡ)(e − ē) = Σ g·e − ḡ·Σe, since the centred weights sum to zero.
+        let centred = f64::from(w.cross[b]);
+        let srr = (s2 - 2.0 * (centred + tpl.mg * s1)) + tpl.g2;
+        let rss = (srr - sr * sr * tpl.inv_m) + -2.0 * tilt * sxr + tilt * tilt * tpl.sxx;
+        let mse = (rss * tpl.inv_m).max(0.0);
+        let denom = (vh * vt).sqrt();
+        let cov = centred * tpl.inv_m + tilt * (sk * tpl.inv_m - mh * tpl.kbar);
+        let corr = if denom < 1.0e-9 { 0.0 } else { cov / denom };
+        let partial = mse.sqrt() * tpl.lens_scale + 2.0 * (1.0 - corr) + w.drop[b];
+        let gone = pnz[b] - pna[b] != 0.0;
+        w.partial[b] = if gone { f64::INFINITY } else { partial };
+        w.vh[b] = vh;
+        w.vt[b] = vt;
     }
-    let scale = ((vh.sqrt().max(1.0e-3) / vt.sqrt().max(1.0e-3)).ln().abs() - 0.10).max(0.0);
-    let loss = fit + scale + shape + drop;
-    (loss < best).then_some(loss)
-}
-
-/// The best (loss, yaw) of one template at one place: every `step` degrees, then the degrees
-/// between around the best. `None` when the template is too short or flat, or no window fits.
-fn slide(s: &Sums, tpl: &Template, falls: &[f64], score: &ScoreConfig, screen: &ScreenConfig) -> Option<(f64, usize)> {
-    if tpl.elevs.len() < 8 || tpl.gsigma < score.min_relief {
-        return None;
-    }
-    let consider = |best: &mut (f64, usize), yaw: usize| {
-        if let Some(loss) = slide_yaw(s, tpl, falls, yaw, screen.tilt, score, best.0) {
-            *best = (loss, yaw);
-        }
-    };
+    // The relief term is never negative, so a window whose other terms already reach the best
+    // so far cannot win and its logarithm is skipped.
     let mut best = (f64::INFINITY, 0);
-    let step = tpl.step;
-    for j in 0..AZIMUTHS / step {
-        consider(&mut best, j * step);
-    }
-    if best.0.is_finite() {
-        let center = best.1;
-        for d in 1..step {
-            consider(&mut best, (center + d) % AZIMUTHS);
-            consider(&mut best, (center + (AZIMUTHS - d)) % AZIMUTHS);
+    for yaw in 0..AZIMUTHS {
+        let b = if yaw + rot >= AZIMUTHS { yaw + rot - AZIMUTHS } else { yaw + rot };
+        let partial = w.partial[b];
+        if partial < best.0 {
+            // |ln(σh/σt)| with each σ floored at 1e-3, from the variances: ½·|ln(vh/vt)|.
+            let ratio = w.vh[b].max(1.0e-6) / w.vt[b].max(1.0e-6);
+            let scale = (0.5 * ratio.ln().abs() - 0.10).max(0.0);
+            let loss = partial + scale;
+            if loss < best.0 {
+                best = (loss, yaw);
+            }
         }
     }
     best.0.is_finite().then_some(best)
@@ -273,10 +323,17 @@ pub struct ScreenRow {
     pub fov: f64,
 }
 
-#[derive(Default)]
 struct ScreenScratch {
     sums: Sums,
     falls: Vec<f64>,
+    drops: [f64; AZIMUTHS],
+    sweep: Box<Sweep>,
+}
+
+impl Default for ScreenScratch {
+    fn default() -> Self {
+        Self { sums: Sums::default(), falls: Vec::new(), drops: [0.0; AZIMUTHS], sweep: Box::default() }
+    }
 }
 
 /// The screen over every place of `field`, best first (stable: ties keep field order).
@@ -293,9 +350,12 @@ pub fn screen(
         .map_init(ScreenScratch::default, |sc, i| {
             sc.sums.fill(field.angles_of(i));
             falls_into(dem, field.lats[i], field.lons[i], f64::from(field.grounds[i]), score, &mut sc.falls);
+            for (d, &f) in sc.drops.iter_mut().zip(&sc.falls) {
+                *d = drop_penalty(f, score);
+            }
             let mut best: Option<ScreenRow> = None;
             for tpl in templates {
-                if let Some((loss, yaw)) = slide(&sc.sums, tpl, &sc.falls, score, screen)
+                if let Some((loss, yaw)) = sweep(&sc.sums, tpl, &sc.drops, screen.tilt, score.min_relief, &mut sc.sweep)
                     && loss < best.map_or(f64::INFINITY, |b| b.loss)
                 {
                     best = Some(ScreenRow {
@@ -319,6 +379,7 @@ pub fn screen(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::camera::Pixel;
 
     #[test]
     fn dot_matches_a_plain_sum() {
@@ -330,21 +391,6 @@ mod tests {
             let e: Vec<f64> = (0..720).map(|_| f64::from(rng.next_int(2000)) / 100.0 - 10.0).collect();
             let plain: f64 = (0..m).map(|k| g[k] * e[b + k]).sum();
             assert!((plain - dot(&g, &e, b)).abs() < 1e-9);
-        }
-    }
-
-    #[test]
-    fn dot32_is_close_to_the_f64_sum() {
-        let mut rng = crate::java::JavaRandom::new(9);
-        for _ in 0..200 {
-            let m = 8 + rng.next_int(110) as usize;
-            let b = rng.next_int(300) as usize;
-            let g: Vec<f64> = (0..m).map(|_| f64::from(rng.next_int(1500)) / 100.0).collect();
-            let e: Vec<f64> = (0..720).map(|_| f64::from(rng.next_int(1500)) / 100.0).collect();
-            let g32: Vec<f32> = g.iter().map(|&v| v as f32).collect();
-            let e32: Vec<f32> = e.iter().map(|&v| v as f32).collect();
-            let exact = dot(&g, &e, b);
-            assert!((dot32(&g32, &e32, b) - exact).abs() < 1e-4 * exact.abs().max(1.0));
         }
     }
 
@@ -362,6 +408,73 @@ mod tests {
             assert!((s.p0[b + m] - s.p0[b] - naive).abs() < 1e-9);
             let missing = (b..b + m).filter(|j| angles[j % AZIMUTHS] == MISSING).count() as f64;
             assert_eq!(s.pn[b + m] - s.pn[b], missing);
+        }
+    }
+
+    /// One window's screen loss straight from the definitions, in f64, with no running sums:
+    /// residual r = h − g, a capped least-squares line in the column index for roll, then RMSE
+    /// about that line, correlation and relief against the tilted template.
+    fn window_loss(e: &[f64], tpl: &Template, b: usize, tilt_cap: f64, drop: f64) -> f64 {
+        let g = &tpl.elevs;
+        let m = g.len() as f64;
+        let h = &e[b..b + g.len()];
+        let kbar = (m - 1.0) / 2.0;
+        let r: Vec<f64> = h.iter().zip(g).map(|(h, g)| h - g).collect();
+        let rbar = r.iter().sum::<f64>() / m;
+        let sxx: f64 = (0..g.len()).map(|k| (k as f64 - kbar).powi(2)).sum();
+        let sxr: f64 = r.iter().enumerate().map(|(k, r)| (k as f64 - kbar) * r).sum();
+        let tilt = (sxr / sxx).clamp(-tilt_cap, tilt_cap);
+        let gt: Vec<f64> = g.iter().enumerate().map(|(k, g)| g + tilt * (k as f64 - kbar)).collect();
+        let rss: f64 = r.iter().enumerate().map(|(k, r)| (r - rbar - tilt * (k as f64 - kbar)).powi(2)).sum();
+        let (mg, mh) = (gt.iter().sum::<f64>() / m, h.iter().sum::<f64>() / m);
+        let vt = gt.iter().map(|v| (v - mg).powi(2)).sum::<f64>() / m;
+        let vh = h.iter().map(|v| (v - mh).powi(2)).sum::<f64>() / m;
+        let cov = gt.iter().zip(h).map(|(a, b)| (a - mg) * (b - mh)).sum::<f64>() / m;
+        let corr = cov / (vt * vh).sqrt();
+        let scale = ((vh.sqrt() / vt.sqrt()).ln().abs() - 0.10).max(0.0);
+        (rss / m).sqrt() * tpl.lens_scale + scale + 2.0 * (1.0 - corr) + drop
+    }
+
+    #[test]
+    fn sweep_matches_every_window_from_the_definitions() {
+        let score = ScoreConfig::default();
+        let screen_cfg = ScreenConfig::default();
+        let skyline: Vec<Pixel> = (0..160)
+            .map(|k| {
+                let x = 12.5 + 25.0 * f64::from(k);
+                Pixel { x, y: 1200.0 + 150.0 * (x / 300.0).sin() + 60.0 * (x / 97.0).cos() }
+            })
+            .collect();
+        let photo = Photo { width: 4000, height: 3000, skyline };
+        let mut rng = crate::java::JavaRandom::new(11);
+        let mut w = Box::<Sweep>::default();
+        for place in 0..6 {
+            let p = f64::from(place);
+            let mut angles = [0_i16; AZIMUTHS];
+            for (az, a) in angles.iter_mut().enumerate() {
+                let t = (az as f64).to_radians();
+                *a = (300.0 + 250.0 * (3.0 * t + p).sin() + 120.0 * (8.0 * t + 2.0 * p).sin()) as i16;
+            }
+            let mut drops = [0.0; AZIMUTHS];
+            for d in &mut drops {
+                *d = f64::from(rng.next_int(100)) / 400.0;
+            }
+            let mut s = Sums::default();
+            s.fill(&angles);
+            for tpl in templates(&photo, &score, &screen_cfg) {
+                let Some((loss, yaw)) = sweep(&s, &tpl, &drops, screen_cfg.tilt, score.min_relief, &mut w) else {
+                    continue;
+                };
+                let direct = (0..AZIMUTHS)
+                    .map(|y| {
+                        let b = (y + tpl.rot) % AZIMUTHS;
+                        (window_loss(&s.e, &tpl, b, screen_cfg.tilt, drops[y]), y)
+                    })
+                    .fold((f64::INFINITY, 0), |a, c| if c.0 < a.0 { c } else { a });
+                assert!((loss - direct.0).abs() < 1e-5, "fov {} loss {loss} direct {}", tpl.fov, direct.0);
+                let at_yaw = window_loss(&s.e, &tpl, (yaw + tpl.rot) % AZIMUTHS, screen_cfg.tilt, drops[yaw]);
+                assert!((at_yaw - direct.0).abs() < 1e-5, "the chosen yaw is a best window");
+            }
         }
     }
 }

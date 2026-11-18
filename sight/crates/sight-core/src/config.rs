@@ -103,8 +103,6 @@ pub struct ScreenConfig {
     /// Largest skyline slope (degrees of elevation per degree of azimuth) credited to roll:
     /// about three degrees of roll.
     pub tilt: f64,
-    /// Yaw step is fov / this (at least 1), then the degrees between around the best.
-    pub yaw_span: i64,
     /// Survivors per field: the larger of this and `keep_share` of the places.
     pub keep_min: usize,
     /// Share of a field's places kept for the full search.
@@ -118,7 +116,6 @@ impl Default for ScreenConfig {
         Self {
             pitches: vec![-3.0, 3.0, 9.0, 15.0, 21.0],
             tilt: 0.055,
-            yaw_span: 25,
             keep_min: 200,
             keep_share: 0.03,
             reach: 8,

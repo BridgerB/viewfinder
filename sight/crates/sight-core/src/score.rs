@@ -104,6 +104,27 @@ fn select(values: &mut [f64], k: usize) -> f64 {
     *v
 }
 
+/// Largest `rank` that `nth_largest` serves; beyond it `measure` falls back to `select`.
+const TOP_SLOTS: usize = 8;
+
+/// The `rank`-th largest (1-based, 1 ≤ rank ≤ `TOP_SLOTS`) of `values`, which must be finite and
+/// at least `rank` long: the `rank` largest are kept in a descending buffer.
+fn nth_largest(values: impl Iterator<Item = f64>, rank: usize) -> f64 {
+    let mut top = [f64::NEG_INFINITY; TOP_SLOTS];
+    let top = &mut top[..rank];
+    for v in values {
+        if v > top[rank - 1] {
+            let mut i = rank - 1;
+            while i > 0 && top[i - 1] < v {
+                top[i] = top[i - 1];
+                i -= 1;
+            }
+            top[i] = v;
+        }
+    }
+    top[rank - 1]
+}
+
 /// Fits one camera at one yaw. Pitch is the mean residual of the inliers; the worst
 /// `1 - keep_fraction` of columns (a pole, a tree) are dropped first. `None` when too few
 /// columns reach the horizon or the photograph's relief is under `min_relief`.
@@ -135,10 +156,18 @@ pub fn measure(
     let keep = 1.max((cfg.keep_fraction * used as f64) as usize);
     s.work[..used].copy_from_slice(&s.diffs[..used]);
     let median = select(&mut s.work[..used], used / 2);
-    for i in 0..used {
-        s.work[i] = (s.diffs[i] - median).abs();
-    }
-    let cutoff = select(&mut s.work[..used], keep - 1);
+    // The cutoff is the (keep − 1)-th smallest deviation, i.e. the (used − keep + 1)-th largest:
+    // with 2% trimmed that is about the 4th largest, which a few-slot running buffer finds in one
+    // pass, with exactly the value a sort would give.
+    let rank = used - keep + 1;
+    let cutoff = if rank <= TOP_SLOTS {
+        nth_largest(s.diffs[..used].iter().map(|r| (r - median).abs()), rank)
+    } else {
+        for i in 0..used {
+            s.work[i] = (s.diffs[i] - median).abs();
+        }
+        select(&mut s.work[..used], keep - 1)
+    };
     let (mut k, mut sr, mut srr, mut sg, mut sh, mut sgg, mut shh, mut sgh, mut near, mut floor) =
         (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     for i in 0..used {
@@ -362,6 +391,19 @@ mod tests {
             sorted.sort_by(f64::total_cmp);
             let k = rng.next_int(n as i32) as usize;
             assert_eq!(select(&mut vals.clone(), k), sorted[k]);
+        }
+    }
+
+    #[test]
+    fn nth_largest_is_the_sorted_value() {
+        let mut rng = crate::java::JavaRandom::new(4);
+        for _ in 0..2000 {
+            let n = 8 + rng.next_int(200) as usize;
+            let vals: Vec<f64> = (0..n).map(|_| f64::from(rng.next_int(21)) / 4.0).collect();
+            let rank = 1 + rng.next_int(TOP_SLOTS as i32) as usize;
+            let mut sorted = vals.clone();
+            sorted.sort_by(f64::total_cmp);
+            assert_eq!(nth_largest(vals.iter().copied(), rank), sorted[n - rank]);
         }
     }
 

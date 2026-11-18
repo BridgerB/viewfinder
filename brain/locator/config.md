@@ -16,7 +16,7 @@ sourceRefs:
 |---|---|---|
 | `HorizonConfig` | the ray walk ([[locator/data/horizon-walk]]) | eye 2 m, start 400 m, stop 50 km, step ≈0.4°, R = 7/6 × 6371 km, ceiling 4123 m |
 | `ScoreConfig` | the full search ([[locator/scoring/loss]]) | 16 lenses 40–115° by 5°, rolls −2/0/2°, pitch −5..30°, slack 1°, keep 98%, ref FOV 70° |
-| `ScreenConfig` | the screen ([[locator/screen/screen-templates]]) | tilts −3/3/9/15/21°, roll slope cap 0.055, yaw step fov/25, keep max(200, 3%), reach ±8° |
+| `ScreenConfig` | the screen ([[locator/screen/screen-templates]]) | tilts −3/3/9/15/21°, roll slope cap 0.055, every whole yaw, keep max(200, 3%), reach ±8° |
 | `RefineConfig` | refinement ([[locator/search/refinement]]) | (60 places, 250 m, 500 m), then (15, 100 m, 300 m) |
 | `SkyConfig` | the tracer ([[locator/sky/skyline-trace]]) | rock run 160 px, 160 columns |
 
