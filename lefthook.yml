@@ -1,0 +1,22 @@
+# Git hooks, installed by `pnpm install` (lefthook's install script). Run them by hand with
+# `pnpm exec lefthook run pre-commit --all-files`.
+pre-commit:
+  commands:
+    biome:
+      glob: "*.{js,ts,svelte,json,jsonc,css,html}"
+      run: pnpm exec biome check --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+    rust-format:
+      glob: "sight/**/*.rs"
+      root: "sight/"
+      run: cargo fmt --check
+    rust-lint:
+      glob: "sight/**/*.rs"
+      root: "sight/"
+      run: cargo clippy --release --all-targets -- -D warnings
+    brain:
+      glob: "{brain/**,sight/**,src/**,CLAUDE.md}"
+      run: node brain/check.ts
+    check:
+      run: pnpm check
+    build:
+      run: pnpm build

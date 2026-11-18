@@ -27,7 +27,10 @@ pub struct Horizon {
 
 impl Default for Horizon {
     fn default() -> Self {
-        Self { angles: [MISSING; AZIMUTHS], distances: [0.0; AZIMUTHS] }
+        Self {
+            angles: [MISSING; AZIMUTHS],
+            distances: [0.0; AZIMUTHS],
+        }
     }
 }
 
@@ -79,17 +82,31 @@ impl Ray {
             }
             d *= self.growth;
         }
-        if hit { (best.atan().to_degrees(), best_d) } else { (f64::NAN, 0.0) }
+        if hit {
+            (best.atan().to_degrees(), best_d)
+        } else {
+            (f64::NAN, 0.0)
+        }
     }
 }
 
 fn centi(degrees: f64) -> i16 {
-    if degrees.is_nan() { MISSING } else { java::round(CENTI * degrees) as i16 }
+    if degrees.is_nan() {
+        MISSING
+    } else {
+        java::round(CENTI * degrees) as i16
+    }
 }
 
 /// The horizon from `lat`, `lon` into `out`, or `false` (and `out` untouched) when that cell
 /// has no ground.
-pub fn view_into(dem: &Dem<'_>, cfg: &HorizonConfig, lat: f64, lon: f64, out: &mut Horizon) -> bool {
+pub fn view_into(
+    dem: &Dem<'_>,
+    cfg: &HorizonConfig,
+    lat: f64,
+    lon: f64,
+    out: &mut Horizon,
+) -> bool {
     let Some(ground) = dem.elev_at(lat, lon) else {
         return false;
     };
@@ -132,16 +149,32 @@ mod tests {
                 samples[row * n + col] = 300;
             }
         }
-        let geo = Georef { north: 0.03, west: 0.0, dx: cell, dy: -cell, width: n, height: n };
+        let geo = Georef {
+            north: 0.03,
+            west: 0.0,
+            dx: cell,
+            dy: -cell,
+            width: n,
+            height: n,
+        };
         let dem = Dem::new(geo, &samples).unwrap();
-        let cfg = HorizonConfig { max_distance_m: 5000.0, ..HorizonConfig::default() };
+        let cfg = HorizonConfig {
+            max_distance_m: 5000.0,
+            ..HorizonConfig::default()
+        };
         let lat = 0.03 - 100.0 * cell;
         let lon = 100.0 * cell;
         let h = view(&dem, &cfg, lat, lon).unwrap();
         let east = f64::from(h.angles[90]) / CENTI;
         let west = f64::from(h.angles[270]) / CENTI;
-        assert!(east > 5.0 && east < 10.0, "wall about 300 m up at about 2.1 km: {east}");
-        assert!(west < 0.0, "flat ground to the west sits below the eye: {west}");
+        assert!(
+            east > 5.0 && east < 10.0,
+            "wall about 300 m up at about 2.1 km: {east}"
+        );
+        assert!(
+            west < 0.0,
+            "flat ground to the west sits below the eye: {west}"
+        );
         assert!((f64::from(h.distances[90]) - 2100.0).abs() < 200.0);
     }
 }

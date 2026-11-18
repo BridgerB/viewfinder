@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
+import { resolve } from "$app/paths";
 </script>
 
 <h1>Viewfinder</h1>

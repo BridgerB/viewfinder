@@ -41,9 +41,21 @@ enum Cmd {
     /// Bounds of the grid and the ground near each corner.
     Info { grid: PathBuf },
     /// A horizon field on a STEP-meter lattice over the grid, or over SOUTH NORTH WEST EAST.
-    Build { grid: PathBuf, out: PathBuf, step: f64, #[arg(num_args = 4)] bbox: Vec<f64> },
+    Build {
+        grid: PathBuf,
+        out: PathBuf,
+        step: f64,
+        #[arg(num_args = 4)]
+        bbox: Vec<f64>,
+    },
     /// A horizon field on a STEP-meter lattice, only where the ground within RADIUS spans RELIEF.
-    BuildRough { grid: PathBuf, out: PathBuf, step: f64, radius: f64, relief: f64 },
+    BuildRough {
+        grid: PathBuf,
+        out: PathBuf,
+        step: f64,
+        radius: f64,
+        relief: f64,
+    },
     /// Where a photograph was taken: writes the heatmap and the winning camera's horizon.
     Search {
         grid: PathBuf,
@@ -77,7 +89,11 @@ enum Cmd {
         reach: f64,
     },
     /// The ridge each camera's skyline sits on, for lines of `id lat lon yaw fov`.
-    Ridges { grid: PathBuf, cameras: PathBuf, out: PathBuf },
+    Ridges {
+        grid: PathBuf,
+        cameras: PathBuf,
+        out: PathBuf,
+    },
     /// The traced skyline, as fractions of the frame.
     Trace { image: PathBuf },
     /// Every known-location photograph searched, timed and checked against its truth.
@@ -120,22 +136,82 @@ enum Cmd {
 fn main() -> Result<()> {
     match Cli::parse().cmd {
         Cmd::Info { grid } => info(&grid),
-        Cmd::Build { grid, out, step, bbox } => build(&grid, &out, step, &bbox),
-        Cmd::BuildRough { grid, out, step, radius, relief } => build_rough(&grid, &out, step, radius, relief),
-        Cmd::Search { grid, fields, image, surface, matched, overlay, skyline, fov } => {
-            search_cmd(&grid, &fields, &image, &surface, &matched, overlay.as_deref(), skyline.as_deref(), fov)
-        }
-        Cmd::Around { grid, image, lat, lon, skyline, fov, step, reach } => {
-            around(&grid, &image, lat, lon, skyline.as_deref(), fov, step, reach)
-        }
+        Cmd::Build {
+            grid,
+            out,
+            step,
+            bbox,
+        } => build(&grid, &out, step, &bbox),
+        Cmd::BuildRough {
+            grid,
+            out,
+            step,
+            radius,
+            relief,
+        } => build_rough(&grid, &out, step, radius, relief),
+        Cmd::Search {
+            grid,
+            fields,
+            image,
+            surface,
+            matched,
+            overlay,
+            skyline,
+            fov,
+        } => search_cmd(
+            &grid,
+            &fields,
+            &image,
+            &surface,
+            &matched,
+            overlay.as_deref(),
+            skyline.as_deref(),
+            fov,
+        ),
+        Cmd::Around {
+            grid,
+            image,
+            lat,
+            lon,
+            skyline,
+            fov,
+            step,
+            reach,
+        } => around(
+            &grid,
+            &image,
+            lat,
+            lon,
+            skyline.as_deref(),
+            fov,
+            step,
+            reach,
+        ),
         Cmd::Ridges { grid, cameras, out } => ridges(&grid, &cameras, &out),
         Cmd::Trace { image } => trace(&image),
-        Cmd::Bench { grid, fields, cases, quick, runs } => bench(&grid, &fields, &cases, quick, &runs),
-        Cmd::Profile { grid, fields, image, skyline, places, reps } => {
-            profile(&grid, &fields, &image, skyline.as_deref(), places, reps)
-        }
+        Cmd::Bench {
+            grid,
+            fields,
+            cases,
+            quick,
+            runs,
+        } => bench(&grid, &fields, &cases, quick, &runs),
+        Cmd::Profile {
+            grid,
+            fields,
+            image,
+            skyline,
+            places,
+            reps,
+        } => profile(&grid, &fields, &image, skyline.as_deref(), places, reps),
         Cmd::CompareFields { a, b } => compare_fields(&a, &b),
-        Cmd::Golden { grid, field, image, answer, skyline } => golden(&grid, &field, &image, &answer, skyline.as_deref()),
+        Cmd::Golden {
+            grid,
+            field,
+            image,
+            answer,
+            skyline,
+        } => golden(&grid, &field, &image, &answer, skyline.as_deref()),
         Cmd::CompareTrace { image, skyline } => compare_trace(&image, &skyline),
     }
 }
@@ -148,22 +224,41 @@ fn config(fov: Option<f64>) -> Config {
 }
 
 /// The photograph and its skyline: traced, or read from a file, then decimated.
-fn photo(image: &Path, skyline: Option<&Path>, cfg: &Config) -> Result<(Photo, Vec<sight_core::camera::Pixel>)> {
+fn photo(
+    image: &Path,
+    skyline: Option<&Path>,
+    cfg: &Config,
+) -> Result<(Photo, Vec<sight_core::camera::Pixel>)> {
     let img = sight_io::read_image(image)?;
     let line = match skyline {
         Some(p) => sight_io::read_skyline(p)?,
         None => sky::trace(&img, &cfg.sky),
     };
     let sampled = sky::decimate(&line, cfg.sky.columns);
-    Ok((Photo { width: img.width as u32, height: img.height as u32, skyline: sampled }, line))
+    Ok((
+        Photo {
+            width: img.width as u32,
+            height: img.height as u32,
+            skyline: sampled,
+        },
+        line,
+    ))
 }
 
 fn info(grid: &Path) -> Result<()> {
     let loaded = LoadedDem::open(grid)?;
     let dem = loaded.dem();
     let (n, w, s, e) = (dem.geo.north, dem.geo.west, dem.south(), dem.east());
-    println!("north {n} south {s} west {w} east {e} width {} height {}", dem.geo.width, dem.geo.height);
-    for (name, lat, lon) in [("nw", n - 0.01, w + 0.01), ("ne", n - 0.01, e - 0.01), ("sw", s + 0.01, w + 0.01), ("se", s + 0.01, e - 0.01)] {
+    println!(
+        "north {n} south {s} west {w} east {e} width {} height {}",
+        dem.geo.width, dem.geo.height
+    );
+    for (name, lat, lon) in [
+        ("nw", n - 0.01, w + 0.01),
+        ("ne", n - 0.01, e - 0.01),
+        ("sw", s + 0.01, w + 0.01),
+        ("se", s + 0.01, e - 0.01),
+    ] {
         println!("{name} {:?}", dem.elev_at(lat, lon));
     }
     Ok(())
@@ -180,7 +275,13 @@ fn build(grid: &Path, out: &Path, step: f64, bbox: &[f64]) -> Result<()> {
     let places = field::lattice(s, n, w, e, step);
     let f = field::gather(&dem, &Config::default().horizon, &places);
     sight_io::write_field(out, &f)?;
-    println!("places {} wrote {} to {} in {:.2} s", places.len(), f.len(), out.display(), t0.elapsed().as_secs_f64());
+    println!(
+        "places {} wrote {} to {} in {:.2} s",
+        places.len(),
+        f.len(),
+        out.display(),
+        t0.elapsed().as_secs_f64()
+    );
     Ok(())
 }
 
@@ -189,8 +290,11 @@ fn build_rough(grid: &Path, out: &Path, step: f64, radius: f64, relief: f64) -> 
     let loaded = LoadedDem::open(grid)?;
     let dem = loaded.dem();
     let all = field::lattice(dem.south(), dem.geo.north, dem.geo.west, dem.east(), step);
-    let rough: Vec<(f64, f64)> =
-        all.iter().copied().filter(|&(lat, lon)| field::rugged(&dem, lat, lon, radius, relief)).collect();
+    let rough: Vec<(f64, f64)> = all
+        .iter()
+        .copied()
+        .filter(|&(lat, lon)| field::rugged(&dem, lat, lon, radius, relief))
+        .collect();
     let f = field::gather(&dem, &Config::default().horizon, &rough);
     sight_io::write_field(out, &f)?;
     println!(
@@ -212,12 +316,16 @@ struct Clock {
 
 impl Clock {
     fn new() -> Self {
-        Self { last: Instant::now(), stages: Vec::new() }
+        Self {
+            last: Instant::now(),
+            stages: Vec::new(),
+        }
     }
 
     fn lap(&mut self, name: &str) {
         let now = Instant::now();
-        self.stages.push((name.to_string(), (now - self.last).as_secs_f64()));
+        self.stages
+            .push((name.to_string(), (now - self.last).as_secs_f64()));
         self.last = now;
     }
 }
@@ -234,7 +342,11 @@ impl Timer for Clock {
 }
 
 fn stage_line(stages: &[(String, f64)]) -> String {
-    stages.iter().map(|(n, s)| format!("{n} {s:.2}")).collect::<Vec<_>>().join("  ")
+    stages
+        .iter()
+        .map(|(n, s)| format!("{n} {s:.2}"))
+        .collect::<Vec<_>>()
+        .join("  ")
 }
 
 fn search_cmd(
@@ -257,8 +369,14 @@ fn search_cmd(
     clock.lap("photo");
     let found = search::search(&dem, &fields, &photo, &cfg, &mut clock);
     let best = *found.rows.first().context("no place scored")?;
-    let h = horizon::view(&dem, &cfg.horizon, best.lat, best.lon).context("winner has no ground")?;
-    let pose = Pose { yaw: best.yaw, fov: best.fov, roll: best.roll, pitch: best.pitch };
+    let h =
+        horizon::view(&dem, &cfg.horizon, best.lat, best.lon).context("winner has no ground")?;
+    let pose = Pose {
+        yaw: best.yaw,
+        fov: best.fov,
+        roll: best.roll,
+        pitch: best.pitch,
+    };
     let (w, hgt) = (f64::from(photo.width), f64::from(photo.height));
     let drawn = outline(&h.angles, pose, w, hgt);
     sight_io::write_surface(surface, &found.rows)?;
@@ -288,7 +406,10 @@ fn around(
     let cfg = config(fov);
     let loaded = LoadedDem::open(grid)?;
     let (photo, _) = photo(image, skyline, &cfg)?;
-    for r in search::around(&loaded.dem(), &photo, &cfg, lat, lon, step, reach).iter().take(5) {
+    for r in search::around(&loaded.dem(), &photo, &cfg, lat, lon, step, reach)
+        .iter()
+        .take(5)
+    {
         println!("{r:?}");
     }
     Ok(())
@@ -302,8 +423,11 @@ fn ridges(grid: &Path, cameras: &Path, out: &Path) -> Result<()> {
     let mut rows = Vec::new();
     for line in text.lines() {
         let parts: Vec<&str> = line.split_whitespace().collect();
-        let [id, lat, lon, yaw, fov] = parts.as_slice() else { continue };
-        let (lat, lon, yaw, fov): (f64, f64, f64, f64) = (lat.parse()?, lon.parse()?, yaw.parse()?, fov.parse()?);
+        let [id, lat, lon, yaw, fov] = parts.as_slice() else {
+            continue;
+        };
+        let (lat, lon, yaw, fov): (f64, f64, f64, f64) =
+            (lat.parse()?, lon.parse()?, yaw.parse()?, fov.parse()?);
         let pts = horizon::view(&dem, &cfg.horizon, lat, lon)
             .map(|h| sight_core::geo::ridge(&h.distances, lat, lon, yaw, fov))
             .unwrap_or_default();
@@ -317,10 +441,19 @@ fn ridges(grid: &Path, cameras: &Path, out: &Path) -> Result<()> {
 fn trace(image: &Path) -> Result<()> {
     let img = sight_io::read_image(image)?;
     let line = sky::trace(&img, &Config::default().sky);
-    println!("width {} height {} points {}", img.width, img.height, line.len());
+    println!(
+        "width {} height {} points {}",
+        img.width,
+        img.height,
+        line.len()
+    );
     let step = 1.max(line.len() / 36);
     for p in line.iter().step_by(step) {
-        println!("{:.4} {:.4}", p.x / img.width as f64, p.y / img.height as f64);
+        println!(
+            "{:.4} {:.4}",
+            p.x / img.width as f64,
+            p.y / img.height as f64
+        );
     }
     Ok(())
 }
@@ -332,7 +465,10 @@ fn km_between(a: [f64; 2], b: [f64; 2]) -> f64 {
 }
 
 fn first_within(truth: [f64; 2], points: impl Iterator<Item = [f64; 2]>) -> Option<usize> {
-    points.enumerate().find(|(_, p)| km_between(truth, *p) <= 1.0).map(|(i, _)| i + 1)
+    points
+        .enumerate()
+        .find(|(_, p)| km_between(truth, *p) <= 1.0)
+        .map(|(i, _)| i + 1)
 }
 
 #[derive(Serialize, serde::Deserialize)]
@@ -363,7 +499,11 @@ fn latest_run(dir: &Path) -> Option<BenchRun> {
     let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
         .ok()?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().is_some_and(|x| x == "json") && p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("rust-")))
+        .filter(|p| {
+            p.extension().is_some_and(|x| x == "json")
+                && p.file_name()
+                    .is_some_and(|n| n.to_string_lossy().starts_with("rust-"))
+        })
         .collect();
     files.sort();
     serde_json::from_str(&std::fs::read_to_string(files.last()?).ok()?).ok()
@@ -377,7 +517,10 @@ fn bench(grid: &Path, fields: &str, cases: &Path, quick: bool, runs: &Path) -> R
     let fields = sight_io::read_fields(fields)?;
     let load_seconds = t0.elapsed().as_secs_f64();
     let mut results = Vec::new();
-    for case in sight_io::read_cases(cases)?.into_iter().filter(|c| !quick || c.quick) {
+    for case in sight_io::read_cases(cases)?
+        .into_iter()
+        .filter(|c| !quick || c.quick)
+    {
         let cfg = config(case.fov);
         let start = Instant::now();
         let mut clock = Clock::new();
@@ -416,14 +559,30 @@ fn bench(grid: &Path, fields: &str, cases: &Path, quick: bool, runs: &Path) -> R
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_default();
-    let at = format!("{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs());
-    let run = BenchRun { at: at.clone(), git, quick, load_seconds, cases: results };
+    let at = format!(
+        "{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs()
+    );
+    let run = BenchRun {
+        at: at.clone(),
+        git,
+        quick,
+        load_seconds,
+        cases: results,
+    };
     std::fs::create_dir_all(runs)?;
     let out = runs.join(format!("rust-{at}.json"));
     std::fs::write(&out, serde_json::to_string_pretty(&run)?)?;
-    println!("\n{:<18} {:>8} {:>8} {:>9} {:>8} {:>8} {:>6}", "case", "km", "was km", "baseline", "seconds", "was s", "rank");
+    println!(
+        "\n{:<18} {:>8} {:>8} {:>9} {:>8} {:>8} {:>6}",
+        "case", "km", "was km", "baseline", "seconds", "was s", "rank"
+    );
     for r in &run.cases {
-        let was = before.as_ref().and_then(|b| b.cases.iter().find(|c| c.id == r.id));
+        let was = before
+            .as_ref()
+            .and_then(|b| b.cases.iter().find(|c| c.id == r.id));
         println!(
             "{:<18} {:>8.2} {:>8} {:>9.2} {:>8.2} {:>8} {:>6}",
             r.id,
@@ -436,11 +595,21 @@ fn bench(grid: &Path, fields: &str, cases: &Path, quick: bool, runs: &Path) -> R
         );
     }
     let total: f64 = run.cases.iter().map(|c| c.seconds).sum();
-    println!("load {load_seconds:.2} s, search total {total:.2} s, wrote {}", out.display());
+    println!(
+        "load {load_seconds:.2} s, search total {total:.2} s, wrote {}",
+        out.display()
+    );
     Ok(())
 }
 
-fn profile(grid: &Path, fields: &str, image: &Path, skyline: Option<&Path>, places: usize, reps: usize) -> Result<()> {
+fn profile(
+    grid: &Path,
+    fields: &str,
+    image: &Path,
+    skyline: Option<&Path>,
+    places: usize,
+    reps: usize,
+) -> Result<()> {
     let cfg = Config::default();
     let loaded = LoadedDem::open(grid)?;
     let dem = loaded.dem();
@@ -480,20 +649,36 @@ fn profile(grid: &Path, fields: &str, image: &Path, skyline: Option<&Path>, plac
     for _ in 0..reps {
         for part in &parts {
             let t = Instant::now();
-            let screened = sight_core::screen::screen(part, &dem, &prep.templates, &cfg.score, &cfg.screen);
+            let screened =
+                sight_core::screen::screen(part, &dem, &prep.templates, &cfg.score, &cfg.screen);
             screen_s += t.elapsed().as_secs_f64();
             let t = Instant::now();
-            let keep = cfg.screen.keep_min.max((cfg.screen.keep_share * part.len() as f64) as usize);
+            let keep = cfg
+                .screen
+                .keep_min
+                .max((cfg.screen.keep_share * part.len() as f64) as usize);
             let chosen = &screened[..keep.min(screened.len())];
             let sub = part.subset(&chosen.iter().map(|r| r.index).collect::<Vec<_>>());
-            let yaws: Vec<Vec<u16>> =
-                chosen.iter().map(|r| sight_core::score::yaws_around(r.yaw, cfg.screen.reach)).collect();
-            let _ = sight_core::score::surface(&sub, &dem, &prep.lenses, sight_core::score::Yaws::PerPlace(&yaws), &cfg.score);
+            let yaws: Vec<Vec<u16>> = chosen
+                .iter()
+                .map(|r| sight_core::score::yaws_around(r.yaw, cfg.screen.reach))
+                .collect();
+            let _ = sight_core::score::surface(
+                &sub,
+                &dem,
+                &prep.lenses,
+                sight_core::score::Yaws::PerPlace(&yaws),
+                &cfg.score,
+            );
             full_s += t.elapsed().as_secs_f64();
         }
     }
     let n = reps.max(1) as f64;
-    println!("per rep: screen {:.3} s, full search on survivors {:.3} s", screen_s / n, full_s / n);
+    println!(
+        "per rep: screen {:.3} s, full search on survivors {:.3} s",
+        screen_s / n,
+        full_s / n
+    );
     Ok(())
 }
 
@@ -504,7 +689,11 @@ fn compare_fields(a: &Path, b: &Path) -> Result<()> {
     }
     let pose = fa.lats.iter().zip(&fb.lats).filter(|(x, y)| x != y).count()
         + fa.lons.iter().zip(&fb.lons).filter(|(x, y)| x != y).count()
-        + fa.grounds.iter().zip(&fb.grounds).filter(|(x, y)| x != y).count();
+        + fa.grounds
+            .iter()
+            .zip(&fb.grounds)
+            .filter(|(x, y)| x != y)
+            .count();
     let (mut angles, mut max_angle, mut dists) = (0usize, 0i32, 0usize);
     for (x, y) in fa.angles.iter().zip(&fb.angles) {
         if x != y {
@@ -537,7 +726,13 @@ struct GoldenRow {
     loss: f64,
 }
 
-fn golden(grid: &Path, field_path: &Path, image: &Path, golden: &Path, skyline: Option<&Path>) -> Result<()> {
+fn golden(
+    grid: &Path,
+    field_path: &Path,
+    image: &Path,
+    golden: &Path,
+    skyline: Option<&Path>,
+) -> Result<()> {
     let cfg = Config::default();
     let loaded = LoadedDem::open(grid)?;
     let dem = loaded.dem();
@@ -546,7 +741,13 @@ fn golden(grid: &Path, field_path: &Path, image: &Path, golden: &Path, skyline: 
     let part = whole.subset(&picks);
     let (photo, _) = photo(image, skyline, &cfg)?;
     let prep = search::Prepared::new(&photo, &cfg);
-    let mut rows = sight_core::score::surface(&part, &dem, &prep.lenses, sight_core::score::Yaws::All, &cfg.score);
+    let mut rows = sight_core::score::surface(
+        &part,
+        &dem,
+        &prep.lenses,
+        sight_core::score::Yaws::All,
+        &cfg.score,
+    );
     rows.sort_by(|a, b| a.lat.total_cmp(&b.lat).then(a.lon.total_cmp(&b.lon)));
     let want: Vec<GoldenRow> = serde_json::from_str(&std::fs::read_to_string(golden)?)?;
     if want.len() != rows.len() {
@@ -554,16 +755,29 @@ fn golden(grid: &Path, field_path: &Path, image: &Path, golden: &Path, skyline: 
     }
     let (mut exact, mut worst) = (0usize, 0.0f64);
     for (g, r) in want.iter().zip(&rows) {
-        let same = g.lat == r.lat && g.lon == r.lon && g.yaw == r.yaw && g.fov == r.fov && g.roll == r.roll;
-        let diff = (g.pitch - r.pitch).abs().max((g.rmse - r.rmse).abs()).max((g.loss - r.loss).abs());
+        let same = g.lat == r.lat
+            && g.lon == r.lon
+            && g.yaw == r.yaw
+            && g.fov == r.fov
+            && g.roll == r.roll;
+        let diff = (g.pitch - r.pitch)
+            .abs()
+            .max((g.rmse - r.rmse).abs())
+            .max((g.loss - r.loss).abs());
         worst = worst.max(diff);
         if same && diff < 1e-9 {
             exact += 1;
         } else {
-            println!("differs at {},{}: want yaw {} fov {} roll {} loss {} / got yaw {} fov {} roll {} loss {}", g.lat, g.lon, g.yaw, g.fov, g.roll, g.loss, r.yaw, r.fov, r.roll, r.loss);
+            println!(
+                "differs at {},{}: want yaw {} fov {} roll {} loss {} / got yaw {} fov {} roll {} loss {}",
+                g.lat, g.lon, g.yaw, g.fov, g.roll, g.loss, r.yaw, r.fov, r.roll, r.loss
+            );
         }
     }
-    println!("golden: {exact}/{} match, worst numeric difference {worst:e}", rows.len());
+    println!(
+        "golden: {exact}/{} match, worst numeric difference {worst:e}",
+        rows.len()
+    );
     Ok(())
 }
 
@@ -576,7 +790,11 @@ fn compare_trace(image: &Path, skyline: &Path) -> Result<()> {
     };
     let (a, b) = (at(&ours), at(&theirs));
     let both = a.keys().filter(|k| b.contains_key(k)).count();
-    let differ: Vec<f64> = a.iter().filter_map(|(k, y)| b.get(k).map(|z| (y - z).abs())).filter(|d| *d > 0.0).collect();
+    let differ: Vec<f64> = a
+        .iter()
+        .filter_map(|(k, y)| b.get(k).map(|z| (y - z).abs()))
+        .filter(|d| *d > 0.0)
+        .collect();
     let worst = differ.iter().copied().fold(0.0, f64::max);
     println!(
         "ours {} theirs {} shared columns {both} differing {} (worst {worst} px)",

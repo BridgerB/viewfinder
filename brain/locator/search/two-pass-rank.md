@@ -3,7 +3,7 @@ type: area
 status: verified
 verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
-  - sight/crates/sight-core/src/search.rs#pub fn rank(field: &Field, dem: &Dem<'_>, prep: &Prepared, cfg: &Config) -> (Vec<Place>, Vec<ScreenRow>) {
+  - sight/crates/sight-core/src/search.rs#pub fn rank(
   - sight/crates/sight-core/src/config.rs#keep_share: 0.03,
   - sight/crates/sight-core/src/config.rs#reach: 8,
   - data/bench/runs/rust-1794987848.json#"screen_rank": 565,

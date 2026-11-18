@@ -20,4 +20,4 @@ sourceRefs:
 
 **Not chosen:** staying on the JVM with a long-lived server and the incubating Vector API (both listed in PERF.md as candidates). They would remove start-up and add SIMD, but keep a JVM in the dev shell and need an incubator module flag; the port was the owner's call, and it also gave a pure, testable core. Neither alternative was measured.
 
-**Open:** the Clojure sources stay as the reference until cut-over; then `sight/src`, `sight/test`, `sight/deps.edn` and the JDK/Clojure packages in the flake go, and notes citing `.clj` files must move their sourceRefs to Rust or PERF.md.
+**Open:** the Clojure sources stay as the reference until cut-over; then `sight/src`, `sight/test`, `sight/deps.edn` go (the flake that provided the JDK and Clojure is already gone), and notes citing `.clj` files must move their sourceRefs to Rust or PERF.md.

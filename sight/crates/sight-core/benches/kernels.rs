@@ -14,7 +14,9 @@ fn main() {
 
 fn data(m: usize) -> (Vec<f64>, Vec<f64>) {
     let g: Vec<f64> = (0..m).map(|k| 5.0 + (k as f64 * 0.37).sin()).collect();
-    let e: Vec<f64> = (0..720).map(|j| 4.0 + (j as f64 * 0.11).cos() * 2.0).collect();
+    let e: Vec<f64> = (0..720)
+        .map(|j| 4.0 + (j as f64 * 0.11).cos() * 2.0)
+        .collect();
     (g, e)
 }
 
@@ -37,7 +39,14 @@ fn cross_term(bencher: divan::Bencher, m: usize) {
 fn screen_64_places(bencher: divan::Bencher) {
     let n = 400;
     let samples = vec![1500_i16; n * n];
-    let geo = Georef { north: 40.6, west: -111.9, dx: 1e-4, dy: -1e-4, width: n, height: n };
+    let geo = Georef {
+        north: 40.6,
+        west: -111.9,
+        dx: 1e-4,
+        dy: -1e-4,
+        width: n,
+        height: n,
+    };
     let dem = Dem::new(geo, &samples).unwrap_or_else(|_| std::process::abort());
     let mut field = Field::default();
     for i in 0..64 {
@@ -49,18 +58,30 @@ fn screen_64_places(bencher: divan::Bencher) {
             let a = (az as f64).to_radians();
             (200.0 + 300.0 * (3.0 * a + p).sin() + 150.0 * (7.0 * a + 2.0 * p).sin()) as i16
         }));
-        field.distances.extend(std::iter::repeat_n(8000.0_f32, AZIMUTHS));
+        field
+            .distances
+            .extend(std::iter::repeat_n(8000.0_f32, AZIMUTHS));
     }
     let skyline: Vec<Pixel> = (0..160)
         .map(|k| {
             let x = 12.5 + 25.0 * f64::from(k);
-            Pixel { x, y: 1200.0 + 150.0 * (x / 300.0).sin() + 60.0 * (x / 97.0).cos() }
+            Pixel {
+                x,
+                y: 1200.0 + 150.0 * (x / 300.0).sin() + 60.0 * (x / 97.0).cos(),
+            }
         })
         .collect();
-    let photo = Photo { width: 4000, height: 3000, skyline };
+    let photo = Photo {
+        width: 4000,
+        height: 3000,
+        skyline,
+    };
     let (score, scr) = (ScoreConfig::default(), ScreenConfig::default());
     let tpls = templates(&photo, &score, &scr);
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(1).build().unwrap_or_else(|_| std::process::abort());
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .build()
+        .unwrap_or_else(|_| std::process::abort());
     bencher.bench(|| pool.install(|| screen(divan::black_box(&field), &dem, &tpls, &score, &scr)));
 }
 

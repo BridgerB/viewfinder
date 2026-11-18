@@ -1,81 +1,88 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import viewpointsData from '$lib/assets/timpanogos.json';
+import viewpointsData from "#lib/assets/timpanogos.json";
+import { resolve } from "$app/paths";
 
-	interface Coordinate {
-		latitude: number;
-		longitude: number;
-	}
+interface Coordinate {
+	latitude: number;
+	longitude: number;
+}
 
-	interface HorizonPoint {
-		relativeDirection: number;
-		elevationAngleDegrees: number;
-		distanceKm: number;
-	}
+interface HorizonPoint {
+	relativeDirection: number;
+	elevationAngleDegrees: number;
+	distanceKm: number;
+}
 
-	interface Viewpoint {
-		angle: number;
-		viewpoint: Coordinate;
-		bearingToPeak: number;
-		horizon: HorizonPoint[];
-	}
+interface Viewpoint {
+	angle: number;
+	viewpoint: Coordinate;
+	bearingToPeak: number;
+	horizon: HorizonPoint[];
+}
 
-	interface RgbColor {
-		red: number;
-		green: number;
-		blue: number;
-	}
+interface RgbColor {
+	red: number;
+	green: number;
+	blue: number;
+}
 
-	const MAX_ELEVATION_DEGREES = 25;
-	const MAX_DISTANCE_KM = 15;
-	const CLOSE_COLOR: RgbColor = { red: 255, green: 107, blue: 53 };
-	const FAR_COLOR: RgbColor = { red: 65, green: 88, blue: 208 };
+const MAX_ELEVATION_DEGREES = 25;
+const MAX_DISTANCE_KM = 15;
+const CLOSE_COLOR: RgbColor = { red: 255, green: 107, blue: 53 };
+const FAR_COLOR: RgbColor = { red: 65, green: 88, blue: 208 };
 
-	const clamp = (value: number, min: number, max: number): number =>
-		Math.min(Math.max(value, min), max);
+const clamp = (value: number, min: number, max: number): number =>
+	Math.min(Math.max(value, min), max);
 
-	const linearInterpolate = (start: number, end: number, ratio: number): number =>
-		Math.round(start + (end - start) * ratio);
+const linearInterpolate = (start: number, end: number, ratio: number): number =>
+	Math.round(start + (end - start) * ratio);
 
-	const interpolateColor = (fromColor: RgbColor, toColor: RgbColor, ratio: number): RgbColor => ({
-		red: linearInterpolate(fromColor.red, toColor.red, ratio),
-		green: linearInterpolate(fromColor.green, toColor.green, ratio),
-		blue: linearInterpolate(fromColor.blue, toColor.blue, ratio)
-	});
+const interpolateColor = (
+	fromColor: RgbColor,
+	toColor: RgbColor,
+	ratio: number,
+): RgbColor => ({
+	red: linearInterpolate(fromColor.red, toColor.red, ratio),
+	green: linearInterpolate(fromColor.green, toColor.green, ratio),
+	blue: linearInterpolate(fromColor.blue, toColor.blue, ratio),
+});
 
-	const rgbToString = (color: RgbColor): string => `rgb(${color.red},${color.green},${color.blue})`;
+const rgbToString = (color: RgbColor): string =>
+	`rgb(${color.red},${color.green},${color.blue})`;
 
-	const calculateDistanceColor = (distanceKm: number): string => {
-		const interpolationRatio = clamp(distanceKm / MAX_DISTANCE_KM, 0, 1);
-		return rgbToString(interpolateColor(CLOSE_COLOR, FAR_COLOR, interpolationRatio));
-	};
+const calculateDistanceColor = (distanceKm: number): string => {
+	const interpolationRatio = clamp(distanceKm / MAX_DISTANCE_KM, 0, 1);
+	return rgbToString(
+		interpolateColor(CLOSE_COLOR, FAR_COLOR, interpolationRatio),
+	);
+};
 
-	const calculateBarHeight = (elevationDegrees: number): number =>
-		(elevationDegrees / MAX_ELEVATION_DEGREES) * 100;
+const calculateBarHeight = (elevationDegrees: number): number =>
+	(elevationDegrees / MAX_ELEVATION_DEGREES) * 100;
 
-	const formatCoordinate = (coordinate: Coordinate): string =>
-		`${coordinate.latitude.toFixed(4)}°N, ${Math.abs(coordinate.longitude).toFixed(4)}°W`;
+const formatCoordinate = (coordinate: Coordinate): string =>
+	`${coordinate.latitude.toFixed(4)}°N, ${Math.abs(coordinate.longitude).toFixed(4)}°W`;
 
-	let viewpoints: Viewpoint[] = viewpointsData as Viewpoint[];
-	let currentAngle = $state(187);
-	let playing = $state(true);
-	let animationSpeed = $state(500);
-	let animationInterval: ReturnType<typeof setInterval>;
+let viewpoints: Viewpoint[] = viewpointsData as Viewpoint[];
+let currentAngle = $state(187);
+let playing = $state(true);
+let animationSpeed = $state(500);
+let animationInterval: ReturnType<typeof setInterval>;
 
-	$effect(() => {
-		if (!playing) return () => {};
+$effect(() => {
+	if (!playing) return () => {};
 
-		const intervalDelayMs = 500 - animationSpeed + 10;
-		animationInterval = setInterval(() => {
-			currentAngle = (currentAngle + 1) % 360;
-		}, intervalDelayMs);
+	const intervalDelayMs = 500 - animationSpeed + 10;
+	animationInterval = setInterval(() => {
+		currentAngle = (currentAngle + 1) % 360;
+	}, intervalDelayMs);
 
-		return () => clearInterval(animationInterval);
-	});
+	return () => clearInterval(animationInterval);
+});
 
-	const togglePlay = (): void => {
-		playing = !playing;
-	};
+const togglePlay = (): void => {
+	playing = !playing;
+};
 </script>
 
 <div class="container">

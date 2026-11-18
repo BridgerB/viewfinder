@@ -5,7 +5,7 @@ verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - src/lib/photo-match.ts#const unproject = (lens: Lens, ray: Ray): Pixel => {
   - src/lib/photo-match.ts#const searchHeat = (hits: readonly SearchHit[]) => {
-  - src/routes/timpanogos/match/+page.svelte#import MatchMap from '$lib/MatchMap.svelte';
+  - src/routes/timpanogos/match/+page.svelte#import MatchMap from "#lib/MatchMap.svelte";
 ---
 
 # Match pages

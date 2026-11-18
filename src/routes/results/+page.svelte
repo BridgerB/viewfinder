@@ -1,41 +1,48 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import resultsData from '$lib/assets/results.json';
-	import ResultsMap from '$lib/ResultsMap.svelte';
+import resultsData from "#lib/assets/results.json";
+import ResultsMap from "#lib/ResultsMap.svelte";
+import { resolve } from "$app/paths";
 
-	type Result = {
-		id: string;
-		name: string;
-		source: string;
-		skyline: string;
-		lens: string;
-		note: string;
-		truth: [number, number];
-		guess: [number, number];
-		errorKm: number;
-		yaw: number;
-		fov: number;
-		pitch: number;
-		rmse: number;
-		loss: number;
-		image: string;
-		ridge: [number, number][];
-		credit: { author: string; license: string; licenseUrl: string; page: string } | null;
-	};
+type Result = {
+	id: string;
+	name: string;
+	source: string;
+	skyline: string;
+	lens: string;
+	note: string;
+	truth: [number, number];
+	guess: [number, number];
+	errorKm: number;
+	yaw: number;
+	fov: number;
+	pitch: number;
+	rmse: number;
+	loss: number;
+	image: string;
+	ridge: [number, number][];
+	credit: {
+		author: string;
+		license: string;
+		licenseUrl: string;
+		page: string;
+	} | null;
+};
 
-	const results = (resultsData as Result[]).toSorted((a, b) => a.errorKm - b.errorKm);
-	let index = $state(0);
-	const current = $derived(results[index] ?? results[0]);
+const results = (resultsData as Result[]).toSorted(
+	(a, b) => a.errorKm - b.errorKm,
+);
+let index = $state(0);
+const current = $derived(results[index] ?? results[0]);
 
-	const verdict = (errorKm: number) =>
-		errorKm <= 1 ? 'found' : errorKm <= 10 ? 'drifted' : 'failed';
-	const step = (by: number) => {
-		index = (index + by + results.length) % results.length;
-	};
-	const onkeydown = (event: KeyboardEvent) => {
-		if (event.key === 'ArrowLeft') step(-1);
-		if (event.key === 'ArrowRight') step(1);
-	};
+const verdict = (errorKm: number) =>
+	errorKm <= 1 ? "found" : errorKm <= 10 ? "drifted" : "failed";
+const step = (by: number) => {
+	index = (index + by + results.length) % results.length;
+};
+const onkeydown = (event: KeyboardEvent) => {
+	if (event.key === "ArrowLeft") step(-1);
+	if (event.key === "ArrowRight") step(1);
+};
 </script>
 
 <svelte:window {onkeydown} />

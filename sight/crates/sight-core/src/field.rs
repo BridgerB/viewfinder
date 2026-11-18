@@ -89,7 +89,14 @@ impl Field {
     /// When the magic, azimuth count or length is wrong.
     pub fn parse(bytes: &[u8]) -> Result<Self, FieldError> {
         let need = |want: usize| {
-            if bytes.len() < want { Err(FieldError::Truncated { have: bytes.len(), want }) } else { Ok(()) }
+            if bytes.len() < want {
+                Err(FieldError::Truncated {
+                    have: bytes.len(),
+                    want,
+                })
+            } else {
+                Ok(())
+            }
         };
         need(HEADER_BYTES)?;
         let magic = [bytes[0], bytes[1], bytes[2], bytes[3]];
@@ -115,9 +122,17 @@ impl Field {
             out.lons.push(f64::from_le_bytes(array8(&rec[8..16])));
             out.grounds.push(f32::from_le_bytes(array4(&rec[16..20])));
             let angles = &rec[POSE_BYTES..POSE_BYTES + AZIMUTHS * 2];
-            out.angles.extend(angles.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])));
+            out.angles.extend(
+                angles
+                    .chunks_exact(2)
+                    .map(|c| i16::from_le_bytes([c[0], c[1]])),
+            );
             let dists = &rec[POSE_BYTES + AZIMUTHS * 2..];
-            out.distances.extend(dists.chunks_exact(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])));
+            out.distances.extend(
+                dists
+                    .chunks_exact(4)
+                    .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])),
+            );
         }
         Ok(out)
     }
@@ -174,7 +189,10 @@ fn steps(start: f64, end: f64, step: f64) -> Vec<f64> {
 /// square.
 #[must_use]
 pub fn lattice(south: f64, north: f64, west: f64, east: f64, step_m: f64) -> Vec<(f64, f64)> {
-    #[allow(clippy::manual_midpoint, reason = "the reference computes (a + b) / 2; the lattice must land on the same bits")]
+    #[allow(
+        clippy::manual_midpoint,
+        reason = "the reference computes (a + b) / 2; the lattice must land on the same bits"
+    )]
     let mid = (south + north) / 2.0;
     let lon_m = horizon::LAT_M * mid.to_radians().cos();
     let dlat = step_m / horizon::LAT_M;
@@ -194,7 +212,10 @@ pub fn around(lat: f64, lon: f64, step_m: f64, reach_m: f64) -> Vec<(f64, f64)> 
     (-n..=n)
         .flat_map(|i| {
             (-n..=n).map(move |j| {
-                (lat + (i as f64 * step_m) / horizon::LAT_M, lon + (j as f64 * step_m) / lon_m)
+                (
+                    lat + (i as f64 * step_m) / horizon::LAT_M,
+                    lon + (j as f64 * step_m) / lon_m,
+                )
             })
         })
         .collect()
@@ -231,7 +252,10 @@ pub fn rugged(dem: &Dem<'_>, lat: f64, lon: f64, radius_m: f64, relief_m: f64) -
     for r in [0.0, radius_m / 3.0, 2.0 * (radius_m / 3.0), radius_m] {
         for k in 0..16 {
             let t = (f64::from(k) * 22.5).to_radians();
-            if let Some(z) = dem.elev_at(lat + (r * t.cos()) / horizon::LAT_M, lon + (r * t.sin()) / lon_m) {
+            if let Some(z) = dem.elev_at(
+                lat + (r * t.cos()) / horizon::LAT_M,
+                lon + (r * t.sin()) / lon_m,
+            ) {
                 lo = lo.min(z);
                 hi = hi.max(z);
             }

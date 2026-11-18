@@ -1,7 +1,9 @@
 <script lang="ts">
-	import favicon from '$lib/assets/favicon.svg';
+import favicon from "#lib/assets/favicon.svg";
+import type { LayoutProps } from "./$types";
+import DemoLinks from "./demo/DemoLinks.svelte";
 
-	let { children } = $props();
+let { children }: LayoutProps = $props();
 </script>
 
 <svelte:head>
@@ -9,3 +11,4 @@
 </svelte:head>
 
 {@render children()}
+<DemoLinks />

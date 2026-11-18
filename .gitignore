@@ -21,8 +21,11 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+# Playwright
+test-results
 
+# Viewfinder: local DEM, fields and bench data; Rust build output
 /data/
-.direnv
-.cpcache/
 /sight/target/
+/sight/.cpcache/
+.direnv

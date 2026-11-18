@@ -78,16 +78,31 @@ impl EnviHeader {
         if get("interleave").map(|s| s.to_lowercase()).as_deref() != Some("bsq") {
             return Err(DemError::NotBsq(get("interleave")));
         }
-        let width = get("samples").and_then(|s| s.parse().ok()).ok_or(DemError::Missing("samples"))?;
-        let height = get("lines").and_then(|s| s.parse().ok()).ok_or(DemError::Missing("lines"))?;
+        let width = get("samples")
+            .and_then(|s| s.parse().ok())
+            .ok_or(DemError::Missing("samples"))?;
+        let height = get("lines")
+            .and_then(|s| s.parse().ok())
+            .ok_or(DemError::Missing("lines"))?;
         let info = get("map info").ok_or(DemError::Missing("map info"))?;
         let nums = numbers(&info);
         if nums.len() < 6 {
             return Err(DemError::NoTiePoint(info));
         }
-        let byte_order = if get("byte order").as_deref() == Some("1") { ByteOrder::Big } else { ByteOrder::Little };
+        let byte_order = if get("byte order").as_deref() == Some("1") {
+            ByteOrder::Big
+        } else {
+            ByteOrder::Little
+        };
         Ok(Self {
-            geo: Georef { west: nums[2], north: nums[3], dx: nums[4], dy: -nums[5].abs(), width, height },
+            geo: Georef {
+                west: nums[2],
+                north: nums[3],
+                dx: nums[4],
+                dy: -nums[5].abs(),
+                width,
+                height,
+            },
             byte_order,
         })
     }
@@ -148,7 +163,10 @@ impl<'a> Dem<'a> {
     pub fn new(geo: Georef, samples: &'a [i16]) -> Result<Self, DemError> {
         let want = geo.width * geo.height;
         if samples.len() != want {
-            return Err(DemError::SizeMismatch { have: samples.len(), want });
+            return Err(DemError::SizeMismatch {
+                have: samples.len(),
+                want,
+            });
         }
         Ok(Self { geo, samples })
     }
@@ -186,7 +204,11 @@ impl<'a> Dem<'a> {
         let g = &self.geo;
         let col = (lon - g.west) / g.dx;
         let row = (lat - g.north) / g.dy;
-        if !(col >= 0.0 && row >= 0.0 && col < (g.width as f64 - 1.0) && row < (g.height as f64 - 1.0)) {
+        if !(col >= 0.0
+            && row >= 0.0
+            && col < (g.width as f64 - 1.0)
+            && row < (g.height as f64 - 1.0))
+        {
             return None;
         }
         let c0 = col.floor() as i64;
@@ -200,7 +222,12 @@ impl<'a> Dem<'a> {
         if v00 == NODATA || v10 == NODATA || v01 == NODATA || v11 == NODATA {
             return None;
         }
-        let (v00, v10, v01, v11) = (f64::from(v00), f64::from(v10), f64::from(v01), f64::from(v11));
+        let (v00, v10, v01, v11) = (
+            f64::from(v00),
+            f64::from(v10),
+            f64::from(v01),
+            f64::from(v11),
+        );
         Some((1.0 - tr) * ((1.0 - tc) * v00 + tc * v10) + tr * ((1.0 - tc) * v01 + tc * v11))
     }
 }
@@ -223,7 +250,14 @@ mod tests {
 
     #[test]
     fn bilinear_and_missing() {
-        let geo = Georef { north: 1.0, west: 0.0, dx: 1.0, dy: -1.0, width: 3, height: 3 };
+        let geo = Georef {
+            north: 1.0,
+            west: 0.0,
+            dx: 1.0,
+            dy: -1.0,
+            width: 3,
+            height: 3,
+        };
         let samples = [0, 10, 20, 0, 10, 20, NODATA, 10, 20];
         let dem = Dem::new(geo, &samples).unwrap();
         assert_eq!(dem.elev_at(1.0, 0.5), Some(5.0));

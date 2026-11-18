@@ -65,12 +65,23 @@ impl Prepared {
 /// search over the best `max(keep_min, keep_share · n)`, with yaw only near where the screen
 /// pointed. Returns the full rows and the screen.
 #[must_use]
-pub fn rank(field: &Field, dem: &Dem<'_>, prep: &Prepared, cfg: &Config) -> (Vec<Place>, Vec<ScreenRow>) {
+pub fn rank(
+    field: &Field,
+    dem: &Dem<'_>,
+    prep: &Prepared,
+    cfg: &Config,
+) -> (Vec<Place>, Vec<ScreenRow>) {
     let screened = screen(field, dem, &prep.templates, &cfg.score, &cfg.screen);
-    let keep = cfg.screen.keep_min.max((cfg.screen.keep_share * field.len() as f64) as usize);
+    let keep = cfg
+        .screen
+        .keep_min
+        .max((cfg.screen.keep_share * field.len() as f64) as usize);
     let chosen = &screened[..keep.min(screened.len())];
     let part = field.subset(&chosen.iter().map(|r| r.index).collect::<Vec<_>>());
-    let yaws: Vec<Vec<u16>> = chosen.iter().map(|r| yaws_around(r.yaw, cfg.screen.reach)).collect();
+    let yaws: Vec<Vec<u16>> = chosen
+        .iter()
+        .map(|r| yaws_around(r.yaw, cfg.screen.reach))
+        .collect();
     let rows = surface(&part, dem, &prep.lenses, Yaws::PerPlace(&yaws), &cfg.score);
     (rows, screened)
 }
@@ -91,7 +102,13 @@ fn by_loss(rows: &mut [Place]) {
 }
 
 /// Where `photo` was taken, searching `fields` and refining around the best places.
-pub fn search(dem: &Dem<'_>, fields: &[Field], photo: &Photo, cfg: &Config, timer: &mut impl Timer) -> Found {
+pub fn search(
+    dem: &Dem<'_>,
+    fields: &[Field],
+    photo: &Photo,
+    cfg: &Config,
+    timer: &mut impl Timer,
+) -> Found {
     let prep = Prepared::new(photo, cfg);
     timer.mark(Stage::Prepare);
     let mut coarse = Vec::new();
@@ -117,13 +134,25 @@ pub fn search(dem: &Dem<'_>, fields: &[Field], photo: &Photo, cfg: &Config, time
         timer.mark(Stage::Refine(pass));
     }
     by_loss(&mut all);
-    Found { rows: all, screen: screened, counts }
+    Found {
+        rows: all,
+        screen: screened,
+        counts,
+    }
 }
 
 /// Every place within `reach_m` of `lat`, `lon`, on a `step_m` grid, ranked: does the ground
 /// near a known camera fit, and by how much does the winner beat it.
 #[must_use]
-pub fn around(dem: &Dem<'_>, photo: &Photo, cfg: &Config, lat: f64, lon: f64, step_m: f64, reach_m: f64) -> Vec<Place> {
+pub fn around(
+    dem: &Dem<'_>,
+    photo: &Photo,
+    cfg: &Config,
+    lat: f64,
+    lon: f64,
+    step_m: f64,
+    reach_m: f64,
+) -> Vec<Place> {
     let prep = Prepared::new(photo, cfg);
     let fresh = field::gather(dem, &cfg.horizon, &field::around(lat, lon, step_m, reach_m));
     rank(&fresh, dem, &prep, cfg).0

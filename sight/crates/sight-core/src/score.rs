@@ -58,7 +58,13 @@ pub struct Scratch {
 
 impl Scratch {
     fn fit(&mut self, n: usize) {
-        for v in [&mut self.gs, &mut self.hs, &mut self.ds, &mut self.diffs, &mut self.work] {
+        for v in [
+            &mut self.gs,
+            &mut self.hs,
+            &mut self.ds,
+            &mut self.diffs,
+            &mut self.work,
+        ] {
             v.clear();
             v.resize(n, 0.0);
         }
@@ -141,7 +147,9 @@ pub fn measure(
     let mut used = 0;
     for i in 0..n {
         let az = wrap(yaw as f64 + cam.offsets[i]);
-        let Some(h) = angle_at(angles, az) else { continue };
+        let Some(h) = angle_at(angles, az) else {
+            continue;
+        };
         let g = cam.elevs[i];
         let hd = h / CENTI;
         s.gs[used] = g;
@@ -199,16 +207,32 @@ pub fn measure(
     let gsigma = vg.sqrt();
     let hsigma = vh.sqrt();
     let denom = (vg * vh).sqrt();
-    let corr = if denom < 1.0e-6 { 0.0 } else { ((sgh / k - mg * mh) / denom).clamp(-1.0, 1.0) };
+    let corr = if denom < 1.0e-6 {
+        0.0
+    } else {
+        ((sgh / k - mg * mh) / denom).clamp(-1.0, 1.0)
+    };
     // One step of the coarse field of view moves the relief by about this much; a gap inside
     // it is the lens grid, not a wrong distance.
     let scale = ((hsigma.max(1.0e-3) / gsigma.max(1.0e-3)).ln().abs() - 0.10).max(0.0);
     let slope = (near / k - cfg.near_keep).max(0.0);
-    let loss = rmse + scale + 2.0 * (1.0 - corr) + cfg.near_weight * slope + cfg.floor_weight * (floor / k);
+    let loss = rmse
+        + scale
+        + 2.0 * (1.0 - corr)
+        + cfg.near_weight * slope
+        + cfg.floor_weight * (floor / k);
     if gsigma < cfg.min_relief {
         return None;
     }
-    Some(Measure { rmse, pitch, used: k, gsigma, hsigma, corr, loss })
+    Some(Measure {
+        rmse,
+        pitch,
+        used: k,
+        gsigma,
+        hsigma,
+        corr,
+        loss,
+    })
 }
 
 /// How far the level camera must tilt for its skyline to sit on the horizon at `yaw`, in
@@ -258,13 +282,24 @@ pub fn drop_penalty(fall: f64, cfg: &ScoreConfig) -> f64 {
 
 /// Meters the ground `foreground_m` ahead is below the camera, per degree of azimuth; positive
 /// when the earth drops. Off the grid counts as level: missing ground is not a canyon.
-pub fn falls_into(dem: &Dem<'_>, lat: f64, lon: f64, ground: f64, cfg: &ScoreConfig, out: &mut Vec<f64>) {
+pub fn falls_into(
+    dem: &Dem<'_>,
+    lat: f64,
+    lon: f64,
+    ground: f64,
+    cfg: &ScoreConfig,
+    out: &mut Vec<f64>,
+) {
     out.clear();
     let lon_m = LAT_M * lat.to_radians().cos();
     let dist = cfg.foreground_m;
     out.extend((0..AZIMUTHS).map(|az| {
         let r = (az as f64).to_radians();
-        dem.elev_at(lat + (dist * r.cos()) / LAT_M, lon + (dist * r.sin()) / lon_m).map_or(0.0, |z| ground - z)
+        dem.elev_at(
+            lat + (dist * r.cos()) / LAT_M,
+            lon + (dist * r.sin()) / lon_m,
+        )
+        .map_or(0.0, |z| ground - z)
     }));
 }
 
@@ -292,10 +327,19 @@ fn best_yaw(
     let mut best: Option<Hit> = None;
     for &yaw in yaws {
         let yaw = usize::from(yaw);
-        let Some((cam, m)) = fit(angles, distances, lens, yaw, cfg, s) else { continue };
+        let Some((cam, m)) = fit(angles, distances, lens, yaw, cfg, s) else {
+            continue;
+        };
         let loss = m.loss + m.rmse * lens_scale + drop_penalty(falls[yaw], cfg);
         if loss < best.map_or(f64::INFINITY, |b| b.loss) {
-            best = Some(Hit { loss, yaw, pitch: cam.pitch + m.pitch, m, fov: cam.fov, roll: cam.roll });
+            best = Some(Hit {
+                loss,
+                yaw,
+                pitch: cam.pitch + m.pitch,
+                m,
+                fov: cam.fov,
+                roll: cam.roll,
+            });
         }
     }
     best
@@ -305,9 +349,18 @@ fn best_yaw(
 /// after that the earlier one stays.
 fn min_hit(hits: &[Hit]) -> Option<Hit> {
     let (&first, rest) = hits.split_first()?;
-    let Some((&second, rest)) = rest.split_first() else { return Some(first) };
-    let start = if first.loss < second.loss { first } else { second };
-    Some(rest.iter().fold(start, |cur, &h| if h.loss < cur.loss { h } else { cur }))
+    let Some((&second, rest)) = rest.split_first() else {
+        return Some(first);
+    };
+    let start = if first.loss < second.loss {
+        first
+    } else {
+        second
+    };
+    Some(
+        rest.iter()
+            .fold(start, |cur, &h| if h.loss < cur.loss { h } else { cur }),
+    )
 }
 
 /// Which yaws to try at a place.
@@ -322,7 +375,13 @@ pub enum Yaws<'a> {
 /// The best camera at every place of `field` that scored, best first (stable: ties keep field
 /// order).
 #[must_use]
-pub fn surface(field: &Field, dem: &Dem<'_>, lenses: &[Lens], yaws: Yaws<'_>, cfg: &ScoreConfig) -> Vec<Place> {
+pub fn surface(
+    field: &Field,
+    dem: &Dem<'_>,
+    lenses: &[Lens],
+    yaws: Yaws<'_>,
+    cfg: &ScoreConfig,
+) -> Vec<Place> {
     let every: Vec<u16> = (0..AZIMUTHS as u16).collect();
     let mut rows: Vec<Place> = (0..field.len())
         .into_par_iter()
@@ -336,7 +395,17 @@ pub fn surface(field: &Field, dem: &Dem<'_>, lenses: &[Lens], yaws: Yaws<'_>, cf
             };
             let hits: Vec<Hit> = lenses
                 .iter()
-                .filter_map(|lens| best_yaw(field.angles_of(i), field.distances_of(i), lens, &falls, list, cfg, s))
+                .filter_map(|lens| {
+                    best_yaw(
+                        field.angles_of(i),
+                        field.distances_of(i),
+                        lens,
+                        &falls,
+                        list,
+                        cfg,
+                        s,
+                    )
+                })
                 .collect();
             s.falls = falls;
             min_hit(&hits).map(|h| Place {
@@ -366,7 +435,9 @@ pub fn surface(field: &Field, dem: &Dem<'_>, lenses: &[Lens], yaws: Yaws<'_>, cf
 #[must_use]
 pub fn yaws_around(center: f64, reach: i64) -> Vec<u16> {
     let c = crate::java::round(center);
-    (-reach..=reach).map(|d| (c + d).rem_euclid(AZIMUTHS as i64) as u16).collect()
+    (-reach..=reach)
+        .map(|d| (c + d).rem_euclid(AZIMUTHS as i64) as u16)
+        .collect()
 }
 
 #[cfg(test)]
@@ -416,8 +487,22 @@ mod tests {
             .iter()
             .map(|&o| f64::from(angles[(o as i64).rem_euclid(360) as usize]) / CENTI - 1.5)
             .collect();
-        let cam = Camera { fov: 80.0, roll: 0.0, pitch: 0.0, offsets, elevs };
-        let m = measure(&angles, &dists, &cam, 0, &ScoreConfig::default(), &mut Scratch::default()).unwrap();
+        let cam = Camera {
+            fov: 80.0,
+            roll: 0.0,
+            pitch: 0.0,
+            offsets,
+            elevs,
+        };
+        let m = measure(
+            &angles,
+            &dists,
+            &cam,
+            0,
+            &ScoreConfig::default(),
+            &mut Scratch::default(),
+        )
+        .unwrap();
         assert!((m.pitch - 1.5).abs() < 0.02);
         assert!(m.rmse < 0.02);
         assert!((m.corr - 1.0).abs() < 1e-3);
@@ -427,8 +512,24 @@ mod tests {
     fn a_flat_photograph_cannot_place_a_camera() {
         let (angles, dists) = horizon_from(|_| 2.0);
         let offsets: Vec<f64> = (-40..40).map(f64::from).collect();
-        let cam = Camera { fov: 80.0, roll: 0.0, pitch: 0.0, elevs: vec![2.0; offsets.len()], offsets };
-        assert!(measure(&angles, &dists, &cam, 0, &ScoreConfig::default(), &mut Scratch::default()).is_none());
+        let cam = Camera {
+            fov: 80.0,
+            roll: 0.0,
+            pitch: 0.0,
+            elevs: vec![2.0; offsets.len()],
+            offsets,
+        };
+        assert!(
+            measure(
+                &angles,
+                &dists,
+                &cam,
+                0,
+                &ScoreConfig::default(),
+                &mut Scratch::default()
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -437,11 +538,27 @@ mod tests {
             loss,
             yaw,
             pitch: 0.0,
-            m: Measure { rmse: 0.0, pitch: 0.0, used: 0.0, gsigma: 0.0, hsigma: 0.0, corr: 0.0, loss },
+            m: Measure {
+                rmse: 0.0,
+                pitch: 0.0,
+                used: 0.0,
+                gsigma: 0.0,
+                hsigma: 0.0,
+                corr: 0.0,
+                loss,
+            },
             fov: 0.0,
             roll: 0.0,
         };
-        assert_eq!(min_hit(&[h(1.0, 0), h(1.0, 1)]).unwrap().yaw, 1, "later of the first two");
-        assert_eq!(min_hit(&[h(2.0, 0), h(1.0, 1), h(1.0, 2)]).unwrap().yaw, 1, "then the earlier stays");
+        assert_eq!(
+            min_hit(&[h(1.0, 0), h(1.0, 1)]).unwrap().yaw,
+            1,
+            "later of the first two"
+        );
+        assert_eq!(
+            min_hit(&[h(2.0, 0), h(1.0, 1), h(1.0, 2)]).unwrap().yaw,
+            1,
+            "then the earlier stays"
+        );
     }
 }

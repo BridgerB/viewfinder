@@ -6,79 +6,80 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Viewfinder works out where a photograph of a mountain skyline was taken by comparing the skyline in the photo against terrain horizons computed from USGS elevation data. It is two programs that only meet through JSON files:
 
-- `sight/` — a Clojure CLI that does all the heavy computation (horizon ray-walks over the DEM, skyline tracing, scoring every candidate place).
-- `src/` — a SvelteKit (Svelte 5, adapter-node) site that only _displays_ pregenerated results bundled from `src/lib/assets/*.json`. There are no server routes and no runtime computation.
+- `sight/` — a Rust workspace (the `sight` CLI) that does all the heavy computation: horizon ray-walks over the DEM, skyline tracing, scoring every candidate place.
+- `src/` — a SvelteKit 3 site (Svelte 5, `@sveltejs/adapter-cloudflare`, deployed as a Cloudflare Worker) that only _displays_ pregenerated results bundled from `src/lib/assets/*.json`. The viewfinder pages have no server routes and no runtime computation.
 
-## Commands
+`brain/` is the project's knowledge base: why every number and decision is what it is, with each claim cited to source text. Read `brain/_index.md` before changing the locator; run `node brain/check.ts` after (see `brain/operating-manual.md`).
 
-The dev shell comes from `flake.nix` via direnv (`use flake`): node 22, gdal, jdk, clojure.
-
-```sh
-pnpm dev            # vite dev; port is derived from the project name by @bridgerb/port-from-name (4372)
-pnpm build
-pnpm check          # svelte-kit sync + svelte-check
-pnpm lint           # prettier --check + eslint
-pnpm format
-```
-
-The lockfile checked in is still `package-lock.json`. There are no tests and no CI workflows in this repo.
-
-The Clojure tool runs from `sight/` (paths are relative to that directory):
+## Site commands
 
 ```sh
-cd sight
-clojure -M:run info    ../data/elevation/envi/n41w112
-clojure -M:run time    GRID LAT LON                       # time one horizon
-clojure -M:run trace   IMAGE                              # print the traced skyline as frame fractions
-clojure -M:run build   GRID OUT STEP_M [SOUTH NORTH WEST EAST]   # write a horizon field (.hzn)
-clojure -M:run query   GRID FIELD IMAGE                   # top 16 places for a photo
-clojure -M:run surface GRID FIELD IMAGE OUT.json          # every place's best loss -> heatmap JSON
-clojure -M:run search  GRID FIELD IMAGE SURFACE.json MATCH.json [OVERLAY.jpg [SKYLINE.json|- [FOV]]]
-                                                          # field, then fresh 500 m and 125 m grids around the best;
-                                                          # SKYLINE replaces the tracer, FOV (from EXIF) pins the lens
-clojure -M:run around  GRID IMAGE LAT LON SKYLINE.json|- FOV|-   # score a 125 m grid within 1 km of a point (diagnostic)
-clojure -M:run build-rough GRID OUT 500 3000 300          # 500 m field where relief within 3 km ≥ 300 m (~30k places, ~40 s)
-clojure -M:run ridges  GRID CAMERAS.txt OUT.json          # per-degree ridge points for "id lat lon yaw fov" lines
+pnpm dev            # vite dev (default port 5173)
+pnpm build          # wrangler types --check, then vite build -> .svelte-kit/cloudflare
+pnpm preview        # wrangler dev on the built worker, port 4173
+pnpm check          # wrangler types --check + svelte-kit sync + svelte-check
+pnpm lint           # biome check (format + lint + import order), no writes
+pnpm format         # biome format --write
+pnpm gen            # wrangler types: regenerate worker-configuration.d.ts after editing wrangler.jsonc
+pnpm test           # vitest (unit + component) and playwright e2e
 ```
+
+Lefthook runs on every commit (`lefthook.yml`): Biome on staged files, `cargo fmt --check` and clippy when Rust changed, the brain checker, `pnpm check`, and `pnpm build`. pnpm 11 reads `allowBuilds` from `pnpm-workspace.yaml`; lefthook, esbuild, workerd and sharp must stay allowed there.
+
+Biome (`biome.json`) is the default config plus two things: it skips `worker-configuration.d.ts`, Markdown (its Markdown formatter does not understand YAML frontmatter and mangles the brain notes) and the generated `src/lib/assets/*.json`; and in `.svelte` files it turns off the unused-import/variable rules, because Biome only reads the `<script>` block and cannot see template usage.
+
+Imports use the package `imports` alias `#lib/...` (not `$lib`), with the `.ts` extension for TypeScript modules: `import * as photoMatch from "#lib/photo-match.ts"`.
+
+The base also carries the `sv` add-on demos: Better Auth on D1 via Drizzle (`src/lib/server`, `drizzle.config.ts`, `.env.example`) under `/demo`.
+
+The Worker bundle includes the imported JSON: `timpanogos.json` (4.2 MB) is the bulk of an ~885 KiB gzipped upload (`pnpm exec wrangler deploy --dry-run` prints the size; the free-plan limit is 3 MiB).
+
+## Locator commands
+
+Run from the repository root; build once with `cargo build --release` in `sight/`. `GRID` is the ENVI path _without_ `.hdr`.
+
+```sh
+sight/target/release/sight info    GRID
+sight/target/release/sight build   GRID OUT STEP_M [SOUTH NORTH WEST EAST]   # write a horizon field (.hzn)
+sight/target/release/sight build-rough GRID OUT 500 3000 300               # 500 m field where relief within 3 km ≥ 300 m
+sight/target/release/sight search  GRID FIELDS IMAGE SURFACE.json MATCH.json [--overlay JPG] [--skyline JSON] [--fov DEG]
+sight/target/release/sight around  GRID IMAGE LAT LON [--skyline] [--fov] [--step 125] [--reach 1000]   # diagnostic
+sight/target/release/sight ridges  GRID CAMERAS.txt OUT.json   # ridge points for "id lat lon yaw fov" lines
+sight/target/release/sight trace   IMAGE
+```
+
+`--skyline` replaces the tracer with hand-traced `[x, y]` pixel pairs; `--fov` pins the lens from EXIF (35 mm-equivalent f → 2·atan(18/f)). The tracer takes the first non-sky row per column, so trees, poles and roofs in front of the ridge break it; use `--skyline` for such photos.
 
 `search` takes several fields comma-separated. Use both: `data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn`. Near mountains the good fit is only ~125 m wide, so the 2 km field alone misses it (Little Cottonwood Canyon landed 51 km off). Refinement is 250 m around the best 60, then 100 m around the best 15.
 
-Each pass ranks places in two stages (`score/rank`): a cheap screen (`slide-surface`), then the full search on the survivors. The screen scores every yaw of each lens × tilt template against a place's horizon by sliding sums, with a capped line fit for roll. The full search (`surface`: 3D projection, trimmed error) runs only on the best `max(200, 3%)` places, within ±8° of the screen's yaw. A search takes ~5 s warm, ~12 s cold; it was ~9 min before the screen. `-Dviewfinder.rank=full` turns the screen off; `-Dviewfinder.screen=sparse` uses the older sparse-measure screen.
+Each pass ranks places in two stages (`search::rank`): a screen that sweeps every yaw of each lens × tilt template over every place with prefix sums and register-tiled cross terms, then the full 3D-projected trimmed-error search on the best `max(200, 3%)` places within ±8° of the screen's yaw. A search takes ~1.5–2 s.
 
-Performance work is logged in `sight/PERF.md`. Before changing scoring, run `bench` (all known-location photos; `--quick` for three) and the tests (`golden_test` must still match unless a change is meant to alter results):
+Performance work is logged in `sight/PERF.md`. Before changing scoring, run `bench` (all known-location photos; `--quick` for three) and the tests; `golden` must still match unless a change is meant to alter results:
 
 ```sh
-clojure -M -m viewfinder.main bench data/elevation/envi/n41w112 data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn sight/bench/cases.edn [--quick]
-clojure -M -m viewfinder.main profile GRID FIELDS IMAGE SKYLINE|- N REPS none|cpu|alloc   # cpu/alloc need -M:profile from sight/
-clojure -M:test   # from sight/; golden_test needs the repo root as working dir and skips otherwise
+sight/target/release/sight bench GRID FIELDS sight/bench/cases.toml [--quick]
+sight/target/release/sight profile GRID FIELDS IMAGE [--places 32000] [--reps 3]   # also splits screen vs full search
+cargo test --release && cargo bench -p sight-core     # from sight/
 ```
 
-`-J-Dviewfinder.count=true` turns on inner-loop counters (`viewfinder.trace`). They are compiled out otherwise.
+`sight-core` is pure (no files, clocks or `unsafe`; clippy enforces it), `sight-io` does all file formats, `sight-cli` is the binary. Every tunable number is in `sight-core/src/config.rs` with a comment saying what wrong answer it prevents. The old Clojure implementation in `sight/src`, `sight/test` and `sight/deps.edn` is kept only as the parity reference until it is removed.
 
-`GRID` is the ENVI path _without_ `.hdr` (the header is read from `GRID.hdr`).
+Toolchain: Node 22+, pnpm 11, Rust (cargo, clippy, rustfmt) and Xcode's macOS SDK. If linking fails with `unable to find sdk: 'macosx'`, a Nix `cc`/`xcrun` is ahead of Apple's on `PATH`; run cargo with `PATH=/usr/bin:$PATH`.
 
 ## Data that is not in git
 
 `/data/` is gitignored and must exist locally for `sight` to run:
 
 - `data/elevation/tif/USGS_13_n41w112.tif` — USGS 1/3 arc-second source tile.
-- `data/elevation/envi/n41w112` (+ `.hdr`) — the same tile converted with GDAL to ENVI int16, band-sequential. `dem/read-envi` rejects anything else. The conversion command is not recorded in the repo.
-- `data/elevation/field/n41w112.hzn` — a built horizon field.
+- `data/elevation/envi/n41w112` (+ `.hdr`) — the same tile converted with GDAL to ENVI int16, band-sequential. The reader rejects anything else. The conversion command is not recorded in the repo.
+- `data/elevation/field/n41w112.hzn`, `n41w112-rough500.hzn` — the two horizon fields.
+- `data/bench/` — bench photos, guided skylines and run history.
 
-`scripts/generate-timpanogos.ts` (the older TypeScript generator, using `@bridgerb/horizon` + `gdal-async`) points at `data/n41w112_30m.tif`, which no longer matches the layout above.
+`scripts/generate-timpanogos.ts` (the older TypeScript generator, using `@bridgerb/horizon` + `gdal-async`, which are not installed) points at `data/n41w112_30m.tif`, which no longer matches the layout above.
 
-## Pipeline
+## Locator design
 
-1. **DEM** (`dem.clj`) — loads the whole ENVI grid into a short array. Off-grid and nodata are `nil`, never zero, so a ray can tell it left the loaded land.
-2. **Horizon** (`horizon.clj`) — from one place, for each whole degree of azimuth (0 = north, clockwise), the highest elevation angle the ground reaches, corrected for earth curvature + refraction. The walk starts 400 m out (so ground underfoot can't hide the ridge), steps geometrically, stops at 50 km, and exits early once no possible ground could beat the current best.
-3. **Field** (`field.clj`) — horizons for a lattice of places, packed into a binary `.hzn` file (magic `HZN2`, little-endian; per place: lat, lon, ground, 360 centidegree angles as shorts, 360 distances as floats). Missing rays are the `Short/MIN_VALUE` sentinel. Built once, read on every query. Changing the record layout means bumping the magic and rebuilding.
-4. **Sky** (`sky.clj`) — traces the skyline of a JPEG/PNG: per column, the first row that is not sky/haze and does not return to sky within `rock-run` pixels; then despike (poles) and median-fill; decimated to ~160 columns.
-5. **Score** (`score.clj`) — for every place × field of view (40–115° by 5, a 50 mm lens through a phone's ultrawide) × roll (−2/0/2°) × yaw (every degree), compares the projected photo skyline to the stored horizon. A pixel is a 3D direction: roll about the optical axis, then pitch, then yaw (`ray`). Pitch is part of the projection, because in a wide frame a tilted camera's rows are not lines of equal elevation; each lens is pre-projected at every whole degree of pitch, the level camera guesses the tilt per yaw, and only the last ≤1° is left to the mean residual. Treating elevation as `pitch + atan(y/f)` is wrong by several degrees at the edges of an ultrawide frame and was why the Sandy photo used to land in Millcreek. The trimmed RMSE is scaled by `ref-fov / fov` (pixels, not degrees): a trace is off by pixels, and counting in degrees rewarded the narrowest lens, which sent Sandy and Timpanogos kilometres away whenever narrow lenses were allowed. The loss is in degrees: trimmed RMSE + log relief gap + 2×(1 − correlation), plus penalties for near-ground windows, first-step berms, and ground that falls away ahead of the camera. The namespace docstring and the comments on each constant record _why_ each term exists (what wrong answer it fixed) — read them before tuning, and keep them current when changing the loss.
-6. **Wave** (`wave.clj`) — the parallelism primitive for both build and scoring: batches of 2000 places on a fixed processor-count pool.
-
-`main.clj` states the design constraint: "The search is the field. Nothing in here names a town or a summit." Keep `sight` free of location-specific special cases; fixes belong in the general loss.
-
-The hot loops in `horizon.clj` and `score.clj` run with `*warn-on-reflection*` and `*unchecked-math* :warn-on-boxed`; type hints are placed in `let` bindings because primitive-typed fns can't take that many array args. Maps use namespaced keys (`:dem/…`, `:horizon/…`, `:field/…`, `:sky/…`, `:place/…`, `:camera/…`).
+The search compares the photo's skyline against stored horizons; nothing in it names a town or a summit, and fixes belong in the general loss. A pixel is a 3D direction: roll about the optical axis, then pitch, then yaw. Pitch is part of the projection, because in a wide frame a tilted camera's rows are not lines of equal elevation; treating elevation as `pitch + atan(y/f)` is wrong by several degrees at the edges of an ultrawide frame. The trimmed RMSE is scaled by `ref_fov / fov` (pixels, not degrees): a trace is off by pixels, and counting in degrees rewarded the narrowest lens, which sent Sandy and Timpanogos kilometres away whenever narrow lenses were allowed. The loss is in degrees: trimmed RMSE + log relief gap + 2×(1 − correlation), plus penalties for first-step berms and ground that falls away ahead of the camera. The brain has a note per term.
 
 ## Site
 
@@ -87,18 +88,21 @@ Routes:
 - `/timpanogos` — animated 360° orbit of horizons seen from an 8.9 km ring around the peak (`timpanogos.json`, 360 viewpoints, from `scripts/generate-timpanogos.ts`).
 - `/timpanogos/match` — photo with traced skyline and the model horizon overlaid, per-ring-angle shape match, elevation-angle profile, and the search heatmap.
 - `/sandy/match` — a second photo: traced skyline + search heatmap only.
+- `/results` — every bench photo on a map, one at a time: true spot, guess, and the view wedge out to the ridge the skyline sits on.
 
-`src/lib/photo-match.ts` holds all the pure logic for the match pages (camera projection/unprojection that mirrors `score.clj`'s `ray`, SVG point strings, heat weighting). `src/lib/MatchMap.svelte` is the Leaflet + `leaflet.heat` map; Leaflet is imported dynamically inside an action because it needs `window`, and `leaflet.heat` needs `L` on `globalThis` first.
+`src/lib/photo-match.ts` holds all the pure logic for the match pages (camera projection/unprojection that mirrors the locator's `ray`, SVG point strings, heat weighting). `src/lib/MatchMap.svelte` and `src/lib/ResultsMap.svelte` are Leaflet maps; Leaflet is imported dynamically inside an action because it needs `window`, and `leaflet.heat` needs `L` on `globalThis` first (`src/lib/leaflet-heat.d.ts` declares it, since it ships no types).
 
 Where each asset comes from:
 
-| Asset                                          | Source                                                                                                     |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `timpanogos.json`                              | `scripts/generate-timpanogos.ts`                                                                           |
-| `timpanogos-search.json`, `sandy-search.json`  | `sight` `surface` command (`[{lat, lon, loss}]`)                                                           |
-| `timpanogos-match.json`, `sandy-skyline.json`  | No generator is checked in. Their shapes are defined by `RawMatch` in `photo-match.ts` and the sandy page. |
+| Asset | Source |
+| --- | --- |
+| `timpanogos.json` | `scripts/generate-timpanogos.ts` |
+| `timpanogos-search.json`, `sandy-search.json` | `sight search` surface output (`[{lat, lon, loss}]`) |
+| `sandy-match.json` | `sight search` match output |
+| `results.json` | assembled from bench runs and `sight ridges` |
+| `timpanogos-match.json`, `sandy-skyline.json` | No generator is checked in. Their shapes are defined by `RawMatch` in `photo-match.ts` and the sandy page. |
 
-Photos live in `static/` and are referenced by absolute URL; the JSON is imported through Vite so it is content-hashed.
+Photos live in `static/` and are referenced by absolute URL; the JSON is imported through Vite so it is content-hashed. `static/results/LICENSE.md` records the licence of every Wikimedia photo; the repository is public, so only add photos that may be redistributed and that show no one who has not agreed to it.
 
 ## Svelte MCP
 

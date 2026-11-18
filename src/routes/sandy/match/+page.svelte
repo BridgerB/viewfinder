@@ -1,28 +1,28 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import searchData from '$lib/assets/sandy-search.json';
-	import skylineData from '$lib/assets/sandy-skyline.json';
-	import matchData from '$lib/assets/sandy-match.json';
-	import * as photoMatch from '$lib/photo-match';
-	import MatchMap from '$lib/MatchMap.svelte';
+import matchData from "#lib/assets/sandy-match.json";
+import searchData from "#lib/assets/sandy-search.json";
+import skylineData from "#lib/assets/sandy-skyline.json";
+import MatchMap from "#lib/MatchMap.svelte";
+import * as photoMatch from "#lib/photo-match.ts";
+import { resolve } from "$app/paths";
 
-	const search = photoMatch.searchHeat(searchData as photoMatch.SearchHit[]);
-	const frame = skylineData as {
-		width: number;
-		height: number;
-		points: readonly (readonly [number, number])[];
-	};
-	const skyline = frame.points.map(([x, y]) => `${x},${y}`).join(' ');
-	const match = matchData as {
-		yaw: number;
-		fov: number;
-		roll: number;
-		pitch: number;
-		rmse: number;
-		elev: number;
-		horizon: readonly (readonly [number, number])[];
-	};
-	const horizon = match.horizon.map(([x, y]) => `${x},${y}`).join(' ');
+const search = photoMatch.searchHeat(searchData as photoMatch.SearchHit[]);
+const frame = skylineData as {
+	width: number;
+	height: number;
+	points: readonly (readonly number[])[];
+};
+const skyline = frame.points.map(([x, y]) => `${x},${y}`).join(" ");
+const match = matchData as {
+	yaw: number;
+	fov: number;
+	roll: number;
+	pitch: number;
+	rmse: number;
+	elev: number;
+	horizon: readonly (readonly number[])[];
+};
+const horizon = match.horizon.map(([x, y]) => `${x},${y}`).join(" ");
 </script>
 
 <svelte:head>

@@ -27,7 +27,9 @@ const MASK: u64 = (1 << 48) - 1;
 impl JavaRandom {
     #[must_use]
     pub fn new(seed: i64) -> Self {
-        Self { seed: (seed as u64 ^ MULTIPLIER) & MASK }
+        Self {
+            seed: (seed as u64 ^ MULTIPLIER) & MASK,
+        }
     }
 
     fn next(&mut self, bits: u32) -> i32 {

@@ -6,7 +6,7 @@ sourceRefs:
   - sight/crates/sight-core/src/camera.rs#pub struct Lens {
   - sight/crates/sight-core/src/camera.rs#pub fn tilt_index(&self, degrees: f64) -> Option<usize> {
   - sight/crates/sight-core/src/camera.rs#let kappa = sum / offsets.len().max(1) as f64;
-  - sight/crates/sight-core/src/camera.rs#pub fn lenses(photo: &Photo, fovs: &[f64], rolls: &[f64], pitch_low: i32, pitch_high: i32) -> Vec<Lens> {
+  - sight/crates/sight-core/src/camera.rs#pub fn lenses(
 ---
 
 # Lens and tilts

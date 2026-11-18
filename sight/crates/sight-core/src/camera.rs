@@ -39,7 +39,10 @@ pub fn ray(width: f64, height: f64, f: f64, roll: f64, pitch: f64, x: f64, y: f6
     let sp = pitch.to_radians().sin();
     let up = yr * cp + f * sp;
     let forward = f * cp - yr * sp;
-    (xr.atan2(forward).to_degrees(), up.atan2(xr.hypot(forward)).to_degrees())
+    (
+        xr.atan2(forward).to_degrees(),
+        up.atan2(xr.hypot(forward)).to_degrees(),
+    )
 }
 
 /// The skyline seen through one field of view, roll and pitch: parallel arrays of azimuth
@@ -58,8 +61,18 @@ impl Camera {
     pub fn new(photo: &Photo, fov: f64, roll: f64, pitch: f64) -> Self {
         let (w, h) = (f64::from(photo.width), f64::from(photo.height));
         let f = focal(w, fov);
-        let (offsets, elevs) = photo.skyline.iter().map(|p| ray(w, h, f, roll, pitch, p.x, p.y)).unzip();
-        Self { fov, roll, pitch, offsets, elevs }
+        let (offsets, elevs) = photo
+            .skyline
+            .iter()
+            .map(|p| ray(w, h, f, roll, pitch, p.x, p.y))
+            .unzip();
+        Self {
+            fov,
+            roll,
+            pitch,
+            offsets,
+            elevs,
+        }
     }
 }
 
@@ -81,13 +94,21 @@ pub struct Lens {
 impl Lens {
     #[must_use]
     pub fn new(photo: &Photo, fov: f64, roll: f64, pitch_low: i32, pitch_high: i32) -> Self {
-        let tilts: Vec<Camera> =
-            (pitch_low..=pitch_high).map(|p| Camera::new(photo, fov, roll, f64::from(p))).collect();
+        let tilts: Vec<Camera> = (pitch_low..=pitch_high)
+            .map(|p| Camera::new(photo, fov, roll, f64::from(p)))
+            .collect();
         let level = (-pitch_low).max(0) as usize;
         let offsets = &tilts[level.min(tilts.len().saturating_sub(1))].offsets;
         let sum = offsets.iter().fold(0.0, |s, o| s + o.to_radians().cos());
         let kappa = sum / offsets.len().max(1) as f64;
-        Self { fov, roll, pitch_low, tilts, level, kappa }
+        Self {
+            fov,
+            roll,
+            pitch_low,
+            tilts,
+            level,
+            kappa,
+        }
     }
 
     /// The camera pitched nearest to `degrees`, or `None` outside the pitches tried.
@@ -97,13 +118,21 @@ impl Lens {
             return None;
         }
         let i = crate::java::round(degrees) - i64::from(self.pitch_low);
-        (0..self.tilts.len() as i64).contains(&i).then_some(i as usize)
+        (0..self.tilts.len() as i64)
+            .contains(&i)
+            .then_some(i as usize)
     }
 }
 
 /// Every field of view and roll, in that nesting order.
 #[must_use]
-pub fn lenses(photo: &Photo, fovs: &[f64], rolls: &[f64], pitch_low: i32, pitch_high: i32) -> Vec<Lens> {
+pub fn lenses(
+    photo: &Photo,
+    fovs: &[f64],
+    rolls: &[f64],
+    pitch_low: i32,
+    pitch_high: i32,
+) -> Vec<Lens> {
     fovs.iter()
         .flat_map(|&fov| rolls.iter().map(move |&roll| (fov, roll)))
         .map(|(fov, roll)| Lens::new(photo, fov, roll, pitch_low, pitch_high))
@@ -163,12 +192,18 @@ mod tests {
         let (w, h) = (2000.0, 1500.0);
         let mut angles = [0_i16; AZIMUTHS];
         for (az, a) in angles.iter_mut().enumerate() {
-            *a = crate::java::round(CENTI * (3.0 + 2.0 * (3.0 * az as f64).to_radians().sin())) as i16;
+            *a = crate::java::round(CENTI * (3.0 + 2.0 * (3.0 * az as f64).to_radians().sin()))
+                as i16;
         }
         for fov in [40.0, 70.0, 100.0] {
             for roll in [-2.0, 0.0, 2.0] {
                 for pitch in [-3.0, 0.0, 12.0] {
-                    let pose = Pose { yaw: 120.0, fov, roll, pitch };
+                    let pose = Pose {
+                        yaw: 120.0,
+                        fov,
+                        roll,
+                        pitch,
+                    };
                     let px = outline(&angles, pose, w, h);
                     assert!(!px.is_empty());
                     for (x, y) in px {
@@ -176,7 +211,8 @@ mod tests {
                         let az = 120.0 + off;
                         let whole = az.round();
                         assert!((az - whole).abs() < 1e-6, "on a whole degree");
-                        let want = f64::from(angles[(whole as i64).rem_euclid(360) as usize]) / CENTI;
+                        let want =
+                            f64::from(angles[(whole as i64).rem_euclid(360) as usize]) / CENTI;
                         assert!((elev - want).abs() < 1e-6, "elevation round-trips");
                     }
                 }

@@ -3,10 +3,10 @@ type: area
 status: verified
 verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
-  - sight/crates/sight-core/src/search.rs#pub fn search(dem: &Dem<'_>, fields: &[Field], photo: &Photo, cfg: &Config, timer: &mut impl Timer) -> Found {
+  - sight/crates/sight-core/src/search.rs#pub fn search(
   - sight/crates/sight-core/src/search.rs#fn neighbourhood(rows: &[Place], top: usize, step_m: f64, reach_m: f64) -> Vec<(f64, f64)> {
-  - sight/crates/sight-core/src/config.rs#Self { passes: vec![(60, 250.0, 500.0), (15, 100.0, 300.0)] }
-  - sight/crates/sight-core/src/search.rs#pub fn around(dem: &Dem<'_>, photo: &Photo, cfg: &Config, lat: f64, lon: f64, step_m: f64, reach_m: f64) -> Vec<Place> {
+  - sight/crates/sight-core/src/config.rs#passes: vec![(60, 250.0, 500.0), (15, 100.0, 300.0)],
+  - sight/crates/sight-core/src/search.rs#pub fn around(
 ---
 
 # Refinement

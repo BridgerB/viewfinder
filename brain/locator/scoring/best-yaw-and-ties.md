@@ -5,7 +5,7 @@ verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/score.rs#fn best_yaw(
   - sight/crates/sight-core/src/score.rs#fn min_hit(hits: &[Hit]) -> Option<Hit> {
-  - sight/crates/sight-core/src/score.rs#pub fn surface(field: &Field, dem: &Dem<'_>, lenses: &[Lens], yaws: Yaws<'_>, cfg: &ScoreConfig) -> Vec<Place> {
+  - sight/crates/sight-core/src/score.rs#pub fn surface(
   - sight/crates/sight-core/src/score.rs#pub fn yaws_around(center: f64, reach: i64) -> Vec<u16> {
 ---
 

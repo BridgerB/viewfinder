@@ -59,7 +59,11 @@ impl Template {
         let (offsets, geoms) = (&cam.offsets, &cam.elevs);
         let n = offsets.len();
         // Fewer than two columns cannot be interpolated: an empty template, which sweep rejects.
-        let (start, end) = if n < 2 { (0, -1) } else { (offsets[0].ceil() as i64, offsets[n - 1].floor() as i64) };
+        let (start, end) = if n < 2 {
+            (0, -1)
+        } else {
+            (offsets[0].ceil() as i64, offsets[n - 1].floor() as i64)
+        };
         let m = (end - start + 1).max(0) as usize;
         let last_pair = n.saturating_sub(2);
         let elevs: Vec<f64> = (0..m)
@@ -70,13 +74,20 @@ impl Template {
                     j += 1;
                 }
                 let (o0, o1) = (offsets[j], offsets[j + 1]);
-                let t = if o1 > o0 { (target - o0) / (o1 - o0) } else { 0.0 };
+                let t = if o1 > o0 {
+                    (target - o0) / (o1 - o0)
+                } else {
+                    0.0
+                };
                 geoms[j] + t.clamp(0.0, 1.0) * (geoms[j + 1] - geoms[j])
             })
             .collect();
         let g1 = elevs.iter().fold(0.0, |s, &v| s + v);
         let g2 = elevs.iter().fold(0.0, |s, &v| s + v * v);
-        let gk = elevs.iter().enumerate().fold(0.0, |s, (k, &v)| s + k as f64 * v);
+        let gk = elevs
+            .iter()
+            .enumerate()
+            .fold(0.0, |s, (k, &v)| s + k as f64 * v);
         let mf = m as f64;
         let k1 = (mf * (mf - 1.0)) / 2.0;
         let k2 = ((mf - 1.0) * mf * (2.0 * mf - 1.0)) / 6.0;
@@ -111,8 +122,11 @@ impl Template {
 /// lens is known), at each screen pitch.
 #[must_use]
 pub fn templates(photo: &Photo, score: &ScoreConfig, screen: &ScreenConfig) -> Vec<Template> {
-    let fovs: Vec<f64> =
-        if score.fovs.len() <= 3 { score.fovs.clone() } else { score.fovs.iter().step_by(2).copied().collect() };
+    let fovs: Vec<f64> = if score.fovs.len() <= 3 {
+        score.fovs.clone()
+    } else {
+        score.fovs.iter().step_by(2).copied().collect()
+    };
     fovs.iter()
         .flat_map(|&fov| screen.pitches.iter().map(move |&p| (fov, p)))
         .map(|(fov, pitch)| Template::new(photo, fov, pitch, score))
@@ -266,7 +280,8 @@ fn sweep(
     // Window b spans [b, b + m): each prefix array is sliced once at both ends to exactly 360
     // values, so the loop below has no bounds checks and vectorises.
     let span = |p| span(p, m);
-    let ((p0a, p0z), (p2a, p2z), (pja, pjz), (pna, pnz)) = (span(&s.p0), span(&s.p2), span(&s.pj), span(&s.pn));
+    let ((p0a, p0z), (p2a, p2z), (pja, pjz), (pna, pnz)) =
+        (span(&s.p0), span(&s.p2), span(&s.pj), span(&s.pn));
     for b in 0..AZIMUTHS {
         let s1 = p0z[b] - p0a[b];
         let s2 = p2z[b] - p2a[b];
@@ -297,7 +312,11 @@ fn sweep(
     // so far cannot win and its logarithm is skipped.
     let mut best = (f64::INFINITY, 0);
     for yaw in 0..AZIMUTHS {
-        let b = if yaw + rot >= AZIMUTHS { yaw + rot - AZIMUTHS } else { yaw + rot };
+        let b = if yaw + rot >= AZIMUTHS {
+            yaw + rot - AZIMUTHS
+        } else {
+            yaw + rot
+        };
         let partial = w.partial[b];
         if partial < best.0 {
             // |ln(σh/σt)| with each σ floored at 1e-3, from the variances: ½·|ln(vh/vt)|.
@@ -332,7 +351,12 @@ struct ScreenScratch {
 
 impl Default for ScreenScratch {
     fn default() -> Self {
-        Self { sums: Sums::default(), falls: Vec::new(), drops: [0.0; AZIMUTHS], sweep: Box::default() }
+        Self {
+            sums: Sums::default(),
+            falls: Vec::new(),
+            drops: [0.0; AZIMUTHS],
+            sweep: Box::default(),
+        }
     }
 }
 
@@ -349,14 +373,27 @@ pub fn screen(
         .into_par_iter()
         .map_init(ScreenScratch::default, |sc, i| {
             sc.sums.fill(field.angles_of(i));
-            falls_into(dem, field.lats[i], field.lons[i], f64::from(field.grounds[i]), score, &mut sc.falls);
+            falls_into(
+                dem,
+                field.lats[i],
+                field.lons[i],
+                f64::from(field.grounds[i]),
+                score,
+                &mut sc.falls,
+            );
             for (d, &f) in sc.drops.iter_mut().zip(&sc.falls) {
                 *d = drop_penalty(f, score);
             }
             let mut best: Option<ScreenRow> = None;
             for tpl in templates {
-                if let Some((loss, yaw)) = sweep(&sc.sums, tpl, &sc.drops, screen.tilt, score.min_relief, &mut sc.sweep)
-                    && loss < best.map_or(f64::INFINITY, |b| b.loss)
+                if let Some((loss, yaw)) = sweep(
+                    &sc.sums,
+                    tpl,
+                    &sc.drops,
+                    screen.tilt,
+                    score.min_relief,
+                    &mut sc.sweep,
+                ) && loss < best.map_or(f64::INFINITY, |b| b.loss)
                 {
                     best = Some(ScreenRow {
                         index: i,
@@ -387,8 +424,12 @@ mod tests {
         for _ in 0..200 {
             let m = 1 + rng.next_int(130) as usize;
             let b = rng.next_int(300) as usize;
-            let g: Vec<f64> = (0..m).map(|_| f64::from(rng.next_int(2000)) / 100.0 - 10.0).collect();
-            let e: Vec<f64> = (0..720).map(|_| f64::from(rng.next_int(2000)) / 100.0 - 10.0).collect();
+            let g: Vec<f64> = (0..m)
+                .map(|_| f64::from(rng.next_int(2000)) / 100.0 - 10.0)
+                .collect();
+            let e: Vec<f64> = (0..720)
+                .map(|_| f64::from(rng.next_int(2000)) / 100.0 - 10.0)
+                .collect();
             let plain: f64 = (0..m).map(|k| g[k] * e[b + k]).sum();
             assert!((plain - dot(&g, &e, b)).abs() < 1e-9);
         }
@@ -406,7 +447,9 @@ mod tests {
         for (b, m) in [(0, 50), (330, 60), (90, 20), (101, 40)] {
             let naive: f64 = (b..b + m).map(|j| s.e[j]).sum();
             assert!((s.p0[b + m] - s.p0[b] - naive).abs() < 1e-9);
-            let missing = (b..b + m).filter(|j| angles[j % AZIMUTHS] == MISSING).count() as f64;
+            let missing = (b..b + m)
+                .filter(|j| angles[j % AZIMUTHS] == MISSING)
+                .count() as f64;
             assert_eq!(s.pn[b + m] - s.pn[b], missing);
         }
     }
@@ -422,14 +465,31 @@ mod tests {
         let r: Vec<f64> = h.iter().zip(g).map(|(h, g)| h - g).collect();
         let rbar = r.iter().sum::<f64>() / m;
         let sxx: f64 = (0..g.len()).map(|k| (k as f64 - kbar).powi(2)).sum();
-        let sxr: f64 = r.iter().enumerate().map(|(k, r)| (k as f64 - kbar) * r).sum();
+        let sxr: f64 = r
+            .iter()
+            .enumerate()
+            .map(|(k, r)| (k as f64 - kbar) * r)
+            .sum();
         let tilt = (sxr / sxx).clamp(-tilt_cap, tilt_cap);
-        let gt: Vec<f64> = g.iter().enumerate().map(|(k, g)| g + tilt * (k as f64 - kbar)).collect();
-        let rss: f64 = r.iter().enumerate().map(|(k, r)| (r - rbar - tilt * (k as f64 - kbar)).powi(2)).sum();
+        let gt: Vec<f64> = g
+            .iter()
+            .enumerate()
+            .map(|(k, g)| g + tilt * (k as f64 - kbar))
+            .collect();
+        let rss: f64 = r
+            .iter()
+            .enumerate()
+            .map(|(k, r)| (r - rbar - tilt * (k as f64 - kbar)).powi(2))
+            .sum();
         let (mg, mh) = (gt.iter().sum::<f64>() / m, h.iter().sum::<f64>() / m);
         let vt = gt.iter().map(|v| (v - mg).powi(2)).sum::<f64>() / m;
         let vh = h.iter().map(|v| (v - mh).powi(2)).sum::<f64>() / m;
-        let cov = gt.iter().zip(h).map(|(a, b)| (a - mg) * (b - mh)).sum::<f64>() / m;
+        let cov = gt
+            .iter()
+            .zip(h)
+            .map(|(a, b)| (a - mg) * (b - mh))
+            .sum::<f64>()
+            / m;
         let corr = cov / (vt * vh).sqrt();
         let scale = ((vh.sqrt() / vt.sqrt()).ln().abs() - 0.10).max(0.0);
         (rss / m).sqrt() * tpl.lens_scale + scale + 2.0 * (1.0 - corr) + drop
@@ -442,10 +502,17 @@ mod tests {
         let skyline: Vec<Pixel> = (0..160)
             .map(|k| {
                 let x = 12.5 + 25.0 * f64::from(k);
-                Pixel { x, y: 1200.0 + 150.0 * (x / 300.0).sin() + 60.0 * (x / 97.0).cos() }
+                Pixel {
+                    x,
+                    y: 1200.0 + 150.0 * (x / 300.0).sin() + 60.0 * (x / 97.0).cos(),
+                }
             })
             .collect();
-        let photo = Photo { width: 4000, height: 3000, skyline };
+        let photo = Photo {
+            width: 4000,
+            height: 3000,
+            skyline,
+        };
         let mut rng = crate::java::JavaRandom::new(11);
         let mut w = Box::<Sweep>::default();
         for place in 0..6 {
@@ -453,7 +520,8 @@ mod tests {
             let mut angles = [0_i16; AZIMUTHS];
             for (az, a) in angles.iter_mut().enumerate() {
                 let t = (az as f64).to_radians();
-                *a = (300.0 + 250.0 * (3.0 * t + p).sin() + 120.0 * (8.0 * t + 2.0 * p).sin()) as i16;
+                *a = (300.0 + 250.0 * (3.0 * t + p).sin() + 120.0 * (8.0 * t + 2.0 * p).sin())
+                    as i16;
             }
             let mut drops = [0.0; AZIMUTHS];
             for d in &mut drops {
@@ -462,7 +530,9 @@ mod tests {
             let mut s = Sums::default();
             s.fill(&angles);
             for tpl in templates(&photo, &score, &screen_cfg) {
-                let Some((loss, yaw)) = sweep(&s, &tpl, &drops, screen_cfg.tilt, score.min_relief, &mut w) else {
+                let Some((loss, yaw)) =
+                    sweep(&s, &tpl, &drops, screen_cfg.tilt, score.min_relief, &mut w)
+                else {
                     continue;
                 };
                 let direct = (0..AZIMUTHS)
@@ -471,9 +541,23 @@ mod tests {
                         (window_loss(&s.e, &tpl, b, screen_cfg.tilt, drops[y]), y)
                     })
                     .fold((f64::INFINITY, 0), |a, c| if c.0 < a.0 { c } else { a });
-                assert!((loss - direct.0).abs() < 1e-5, "fov {} loss {loss} direct {}", tpl.fov, direct.0);
-                let at_yaw = window_loss(&s.e, &tpl, (yaw + tpl.rot) % AZIMUTHS, screen_cfg.tilt, drops[yaw]);
-                assert!((at_yaw - direct.0).abs() < 1e-5, "the chosen yaw is a best window");
+                assert!(
+                    (loss - direct.0).abs() < 1e-5,
+                    "fov {} loss {loss} direct {}",
+                    tpl.fov,
+                    direct.0
+                );
+                let at_yaw = window_loss(
+                    &s.e,
+                    &tpl,
+                    (yaw + tpl.rot) % AZIMUTHS,
+                    screen_cfg.tilt,
+                    drops[yaw],
+                );
+                assert!(
+                    (at_yaw - direct.0).abs() < 1e-5,
+                    "the chosen yaw is a best window"
+                );
             }
         }
     }

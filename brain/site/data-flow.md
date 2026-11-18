@@ -5,8 +5,8 @@ verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-io/src/lib.rs#/// Every scored place as `[{"lat","lon","loss"}]`, the heatmap the match page draws.
   - sight/crates/sight-io/src/lib.rs#/// Ridges per camera id as `{"id":[[lat,lon],…]}`.
-  - src/routes/sandy/match/+page.svelte#import skylineData from '$lib/assets/sandy-skyline.json';
-  - src/routes/results/+page.svelte#import resultsData from '$lib/assets/results.json';
+  - src/routes/sandy/match/+page.svelte#import skylineData from "#lib/assets/sandy-skyline.json";
+  - src/routes/results/+page.svelte#import resultsData from "#lib/assets/results.json";
   - CLAUDE.md#No generator is checked in.
 ---
 

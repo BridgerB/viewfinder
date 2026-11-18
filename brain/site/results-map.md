@@ -3,7 +3,7 @@ type: area
 status: verified
 verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
-  - src/lib/ResultsMap.svelte#.bindTooltip('The ridge its skyline sits on')
+  - src/lib/ResultsMap.svelte#.bindTooltip("The ridge its skyline sits on")
   - src/lib/ResultsMap.svelte#map.fitBounds(
   - src/routes/results/+page.svelte#aria-label="Previous photo"
 ---

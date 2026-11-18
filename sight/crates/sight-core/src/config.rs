@@ -132,7 +132,9 @@ pub struct RefineConfig {
 
 impl Default for RefineConfig {
     fn default() -> Self {
-        Self { passes: vec![(60, 250.0, 500.0), (15, 100.0, 300.0)] }
+        Self {
+            passes: vec![(60, 250.0, 500.0), (15, 100.0, 300.0)],
+        }
     }
 }
 
@@ -147,7 +149,10 @@ pub struct SkyConfig {
 
 impl Default for SkyConfig {
     fn default() -> Self {
-        Self { rock_run: 160, columns: 160 }
+        Self {
+            rock_run: 160,
+            columns: 160,
+        }
     }
 }
 

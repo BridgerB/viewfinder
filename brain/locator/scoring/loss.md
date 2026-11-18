@@ -3,11 +3,11 @@ type: area
 status: verified
 verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
-  - sight/crates/sight-core/src/score.rs#let loss = rmse + scale + 2.0 * (1.0 - corr) + cfg.near_weight * slope + cfg.floor_weight * (floor / k);
+  - sight/crates/sight-core/src/score.rs#let loss = rmse
   - sight/crates/sight-core/src/score.rs#let scale = ((hsigma.max(1.0e-3) / gsigma.max(1.0e-3)).ln().abs() - 0.10).max(0.0);
   - sight/crates/sight-core/src/score.rs#let loss = m.loss + m.rmse * lens_scale + drop_penalty(falls[yaw], cfg);
   - sight/crates/sight-core/src/score.rs#pub fn drop_penalty(fall: f64, cfg: &ScoreConfig) -> f64 {
-  - sight/crates/sight-core/src/score.rs#pub fn falls_into(dem: &Dem<'_>, lat: f64, lon: f64, ground: f64, cfg: &ScoreConfig, out: &mut Vec<f64>) {
+  - sight/crates/sight-core/src/score.rs#pub fn falls_into(
   - sight/crates/sight-core/src/config.rs#near_weight: 0.0,
 ---
 

@@ -15,7 +15,11 @@ pub struct Image {
 
 #[inline]
 fn channels(p: u32) -> (i64, i64, i64) {
-    (i64::from((p >> 16) & 0xff), i64::from((p >> 8) & 0xff), i64::from(p & 0xff))
+    (
+        i64::from((p >> 16) & 0xff),
+        i64::from((p >> 8) & 0xff),
+        i64::from(p & 0xff),
+    )
 }
 
 #[inline]
@@ -28,7 +32,11 @@ fn is_sky(r: i64, g: i64, b: i64) -> bool {
 fn is_haze(r: i64, g: i64, b: i64) -> bool {
     let maxv = r.max(g).max(b);
     let minv = r.min(g).min(b);
-    let sat = if maxv == 0 { 0.0 } else { (maxv - minv) as f64 / maxv as f64 };
+    let sat = if maxv == 0 {
+        0.0
+    } else {
+        (maxv - minv) as f64 / maxv as f64
+    };
     let lum = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
     lum > 155.0 && sat < 0.18
 }
@@ -70,7 +78,11 @@ fn fill_median(rows: &[Option<usize>], radius: usize) -> Vec<Option<usize>> {
             let w: Vec<usize> = (-r..=r)
                 .filter_map(|k| {
                     let xx = x + k;
-                    if (0..n).contains(&xx) { rows[xx as usize] } else { None }
+                    if (0..n).contains(&xx) {
+                        rows[xx as usize]
+                    } else {
+                        None
+                    }
                 })
                 .collect();
             (w.len() >= radius).then(|| median_of(w))
@@ -86,7 +98,13 @@ fn despike(rows: &[Option<usize>], radius: usize, jump: usize) -> Vec<Option<usi
         .map(|(&y, w)| match (y, w) {
             (None, _) => None,
             (Some(y), None) => Some(y),
-            (Some(y), Some(w)) => if (y as i64) < w as i64 - jump as i64 { None } else { Some(y) },
+            (Some(y), Some(w)) => {
+                if (y as i64) < w as i64 - jump as i64 {
+                    None
+                } else {
+                    Some(y)
+                }
+            }
         })
         .collect()
 }
@@ -95,7 +113,9 @@ fn despike(rows: &[Option<usize>], radius: usize, jump: usize) -> Vec<Option<usi
 /// below 78% are dropped.
 #[must_use]
 pub fn trace(img: &Image, cfg: &SkyConfig) -> Vec<Pixel> {
-    let raw: Vec<Option<usize>> = (0..img.width).map(|x| ridge_row(img, x, cfg.rock_run)).collect();
+    let raw: Vec<Option<usize>> = (0..img.width)
+        .map(|x| ridge_row(img, x, cfg.rock_run))
+        .collect();
     let cleaned = fill_median(&despike(&raw, 70, 50), 8);
     let h = img.height as f64;
     cleaned
@@ -104,7 +124,10 @@ pub fn trace(img: &Image, cfg: &SkyConfig) -> Vec<Pixel> {
         .filter_map(|(x, y)| {
             let y = (*y)?;
             let share = y as f64 / h;
-            (0.15 < share && share < 0.78).then_some(Pixel { x: x as f64 + 0.5, y: y as f64 + 0.5 })
+            (0.15 < share && share < 0.78).then_some(Pixel {
+                x: x as f64 + 0.5,
+                y: y as f64 + 0.5,
+            })
         })
         .collect()
 }
@@ -133,7 +156,11 @@ mod tests {
                 argb[y * w + x] = rock;
             }
         }
-        let img = Image { width: w, height: h, argb };
+        let img = Image {
+            width: w,
+            height: h,
+            argb,
+        };
         let line = trace(&img, &SkyConfig::default());
         assert_eq!(line.len(), w);
         // The 8-wide median smooths a ramp's ends toward the middle of their window.
@@ -143,7 +170,12 @@ mod tests {
 
     #[test]
     fn decimate_spacing() {
-        let pts: Vec<Pixel> = (0..1000).map(|x| Pixel { x: f64::from(x), y: 0.0 }).collect();
+        let pts: Vec<Pixel> = (0..1000)
+            .map(|x| Pixel {
+                x: f64::from(x),
+                y: 0.0,
+            })
+            .collect();
         let d = decimate(&pts, 160);
         assert_eq!(d.len(), 143, "step ceil(1000/160) = 7");
         assert_eq!(d[1].x, 7.0);

@@ -1,5 +1,5 @@
-import { loadElevationData } from '@bridgerb/horizon';
-import { writeFileSync } from 'fs';
+import { writeFileSync } from "node:fs";
+import { loadElevationData } from "@bridgerb/horizon";
 
 interface Coordinate {
 	latitude: number;
@@ -35,14 +35,14 @@ interface ElevationData {
 		lat: number,
 		lon: number,
 		startDir: number,
-		endDir: number
+		endDir: number,
 	) => RawHorizonPoint[];
 }
 
 const PEAK: Coordinate = { latitude: 40.3908, longitude: -111.6458 };
 const DISTANCE_KM = 8.919;
-const TIF_PATH = 'data/n41w112_30m.tif';
-const OUTPUT_PATH_JSON = 'src/lib/assets/timpanogos.json';
+const TIF_PATH = "data/n41w112_30m.tif";
+const OUTPUT_PATH_JSON = "src/lib/assets/timpanogos.json";
 const EARTH_RADIUS_KM = 6371;
 const HALF_FOV_DEGREES = 45;
 
@@ -61,7 +61,7 @@ const normalizeRelativeDirection = (direction: number): number => {
 const calculateDestinationPoint = (
 	origin: Coordinate,
 	distanceKm: number,
-	bearingDegrees: number
+	bearingDegrees: number,
 ): Coordinate => {
 	const angularDistance = distanceKm / EARTH_RADIUS_KM;
 	const bearingRadians = toRadians(bearingDegrees);
@@ -70,20 +70,24 @@ const calculateDestinationPoint = (
 
 	const destinationLatitudeRadians = Math.asin(
 		Math.sin(originLatitudeRadians) * Math.cos(angularDistance) +
-			Math.cos(originLatitudeRadians) * Math.sin(angularDistance) * Math.cos(bearingRadians)
+			Math.cos(originLatitudeRadians) *
+				Math.sin(angularDistance) *
+				Math.cos(bearingRadians),
 	);
 
 	const destinationLongitudeRadians =
 		originLongitudeRadians +
 		Math.atan2(
-			Math.sin(bearingRadians) * Math.sin(angularDistance) * Math.cos(originLatitudeRadians),
+			Math.sin(bearingRadians) *
+				Math.sin(angularDistance) *
+				Math.cos(originLatitudeRadians),
 			Math.cos(angularDistance) -
-				Math.sin(originLatitudeRadians) * Math.sin(destinationLatitudeRadians)
+				Math.sin(originLatitudeRadians) * Math.sin(destinationLatitudeRadians),
 		);
 
 	return {
 		latitude: toDegrees(destinationLatitudeRadians),
-		longitude: toDegrees(destinationLongitudeRadians)
+		longitude: toDegrees(destinationLongitudeRadians),
 	};
 };
 
@@ -92,60 +96,91 @@ const calculateBearing = (from: Coordinate, to: Coordinate): number => {
 	const fromLatitudeRadians = toRadians(from.latitude);
 	const toLatitudeRadians = toRadians(to.latitude);
 
-	const eastwardComponent = Math.sin(deltaLongitudeRadians) * Math.cos(toLatitudeRadians);
+	const eastwardComponent =
+		Math.sin(deltaLongitudeRadians) * Math.cos(toLatitudeRadians);
 	const northwardComponent =
 		Math.cos(fromLatitudeRadians) * Math.sin(toLatitudeRadians) -
-		Math.sin(fromLatitudeRadians) * Math.cos(toLatitudeRadians) * Math.cos(deltaLongitudeRadians);
+		Math.sin(fromLatitudeRadians) *
+			Math.cos(toLatitudeRadians) *
+			Math.cos(deltaLongitudeRadians);
 
-	return normalizeAngle(toDegrees(Math.atan2(eastwardComponent, northwardComponent)));
+	return normalizeAngle(
+		toDegrees(Math.atan2(eastwardComponent, northwardComponent)),
+	);
 };
 
 const calculateDirectionRange = (bearingToPeak: number): DirectionRange => ({
 	start: Math.floor(normalizeAngle(bearingToPeak - HALF_FOV_DEGREES)),
-	end: Math.floor(normalizeAngle(bearingToPeak + HALF_FOV_DEGREES))
+	end: Math.floor(normalizeAngle(bearingToPeak + HALF_FOV_DEGREES)),
 });
 
 const transformToRelativeDirection = (
 	point: RawHorizonPoint,
-	bearingToPeak: number
+	bearingToPeak: number,
 ): HorizonPoint => ({
-	relativeDirection: normalizeRelativeDirection(point.direction - Math.round(bearingToPeak)),
+	relativeDirection: normalizeRelativeDirection(
+		point.direction - Math.round(bearingToPeak),
+	),
 	elevationAngleDegrees: point.elevationAngleDegrees,
-	distanceKm: point.distanceKm
+	distanceKm: point.distanceKm,
 });
 
 const calculateHorizonForViewpoint = (
 	elevation: ElevationData,
 	viewpoint: Coordinate,
-	bearingToPeak: number
+	bearingToPeak: number,
 ): HorizonPoint[] => {
 	const range = calculateDirectionRange(bearingToPeak);
 	const rangeWrapsAroundNorth = range.start > range.end;
 
 	const rawPoints = rangeWrapsAroundNorth
 		? [
-				...elevation.calculateHorizon(viewpoint.latitude, viewpoint.longitude, range.start, 359),
-				...elevation.calculateHorizon(viewpoint.latitude, viewpoint.longitude, 0, range.end)
+				...elevation.calculateHorizon(
+					viewpoint.latitude,
+					viewpoint.longitude,
+					range.start,
+					359,
+				),
+				...elevation.calculateHorizon(
+					viewpoint.latitude,
+					viewpoint.longitude,
+					0,
+					range.end,
+				),
 			]
-		: elevation.calculateHorizon(viewpoint.latitude, viewpoint.longitude, range.start, range.end);
+		: elevation.calculateHorizon(
+				viewpoint.latitude,
+				viewpoint.longitude,
+				range.start,
+				range.end,
+			);
 
 	return rawPoints
 		.map((point) => transformToRelativeDirection(point, bearingToPeak))
-		.sort((pointA, pointB) => pointA.relativeDirection - pointB.relativeDirection);
+		.sort(
+			(pointA, pointB) => pointA.relativeDirection - pointB.relativeDirection,
+		);
 };
 
-const generateViewpoint = (elevation: ElevationData, angle: number): Viewpoint => {
+const generateViewpoint = (
+	elevation: ElevationData,
+	angle: number,
+): Viewpoint => {
 	const viewpoint = calculateDestinationPoint(PEAK, DISTANCE_KM, angle);
 	const bearingToPeak = calculateBearing(viewpoint, PEAK);
-	const horizon = calculateHorizonForViewpoint(elevation, viewpoint, bearingToPeak);
+	const horizon = calculateHorizonForViewpoint(
+		elevation,
+		viewpoint,
+		bearingToPeak,
+	);
 
 	return { angle, viewpoint, bearingToPeak, horizon };
 };
 
 async function main(): Promise<void> {
-	console.log('Loading elevation data...');
+	console.log("Loading elevation data...");
 	const elevation = await loadElevationData(TIF_PATH);
-	console.log('Generating 360 viewpoints...');
+	console.log("Generating 360 viewpoints...");
 
 	const viewpoints: Viewpoint[] = [];
 

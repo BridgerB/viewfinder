@@ -1,28 +1,36 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
-	import viewpointsData from '$lib/assets/timpanogos.json';
-	import matchData from '$lib/assets/timpanogos-match.json';
-	import searchData from '$lib/assets/timpanogos-search.json';
-	import * as photoMatch from '$lib/photo-match';
-	import MatchMap from '$lib/MatchMap.svelte';
+import viewpointsData from "#lib/assets/timpanogos.json";
+import matchData from "#lib/assets/timpanogos-match.json";
+import searchData from "#lib/assets/timpanogos-search.json";
+import MatchMap from "#lib/MatchMap.svelte";
+import * as photoMatch from "#lib/photo-match.ts";
+import { resolve } from "$app/paths";
 
-	const viewpoints = viewpointsData as photoMatch.Viewpoint[];
-	const match = photoMatch.fromJson(matchData);
-	const lens = photoMatch.lensOf(match.camera);
-	const skylinePoints = photoMatch.skylinePoints(match.skyline);
-	const scorePoints = photoMatch.scorePoints(match.correlation);
-	const search = photoMatch.searchHeat(searchData as photoMatch.SearchHit[]);
+const viewpoints = viewpointsData as photoMatch.Viewpoint[];
+const match = photoMatch.fromJson(matchData);
+const lens = photoMatch.lensOf(match.camera);
+const skylinePoints = photoMatch.skylinePoints(match.skyline);
+const scorePoints = photoMatch.scorePoints(match.correlation);
+const search = photoMatch.searchHeat(searchData as photoMatch.SearchHit[]);
 
-	let currentAngle = $state(match.bestAngle);
-	const angle = $derived(photoMatch.clampIndex(Number(currentAngle)));
-	const viewpoint = $derived(photoMatch.viewpointAt(viewpoints, angle));
-	const horizonPoints = $derived(photoMatch.horizonPoints(lens, viewpoint.horizon));
-	const profile = $derived(photoMatch.profileOf(lens, match.skyline, viewpoint.horizon));
+let currentAngle = $state(match.bestAngle);
+const angle = $derived(photoMatch.clampIndex(Number(currentAngle)));
+const viewpoint = $derived(photoMatch.viewpointAt(viewpoints, angle));
+const horizonPoints = $derived(
+	photoMatch.horizonPoints(lens, viewpoint.horizon),
+);
+const profile = $derived(
+	photoMatch.profileOf(lens, match.skyline, viewpoint.horizon),
+);
 
-	const chooseAngle = (event: PointerEvent & { currentTarget: EventTarget & SVGSVGElement }) => {
-		const bounds = event.currentTarget.getBoundingClientRect();
-		currentAngle = photoMatch.angleAt((event.clientX - bounds.left) / bounds.width);
-	};
+const chooseAngle = (
+	event: PointerEvent & { currentTarget: EventTarget & SVGSVGElement },
+) => {
+	const bounds = event.currentTarget.getBoundingClientRect();
+	currentAngle = photoMatch.angleAt(
+		(event.clientX - bounds.left) / bounds.width,
+	);
+};
 </script>
 
 <svelte:head>
