@@ -179,6 +179,18 @@ fn skyness(p: u32) -> f64 {
 /// Wasatch, where a relative bar passed over sunlit slopes for the trees beneath them.
 const MIN_STEP: f64 = 30.0;
 
+/// Smallest drop in blueness (blue minus red) from above a ridge to below it. Tuned on a photo
+/// where a dark grey cloud sat on a saddle: bright cloud to dark cloud loses brightness but not
+/// blueness, so without this the line ran flat across the cloud instead of dipping with the
+/// ridge.
+const MIN_BLUE_DROP: f64 = 8.0;
+
+/// Mean blueness (blue minus red) of clear sky. Over a step with sky at least this blue the
+/// step is no cloud edge, so `MIN_BLUE_DROP` is not asked of it: under clear sky, hazy blue
+/// mountains lose little blueness and trees just below them lose a lot. Grey cloud measured
+/// 19–26, pale clear sky well above 40.
+const BLUE_SKY: f64 = 40.0;
+
 /// The ridge row in one column of a box: the topmost clear step down from sky to land. Each row
 /// is scored by the mean skyness of up to `k` rows above it minus the mean of up to `k` rows
 /// below (fewer near the box's edges, so a ridge just under the top still counts). The first row
@@ -192,18 +204,39 @@ fn step_row(img: &Image, x: usize, r: Region) -> Option<usize> {
         return None;
     }
     let mut prefix = vec![0.0; h + 1];
+    let mut blue = vec![0.0; h + 1];
     for y in 0..h {
-        prefix[y + 1] = prefix[y] + skyness(img.argb[(r.y0 + y) * img.width + x]);
+        let p = img.argb[(r.y0 + y) * img.width + x];
+        let (red, _, b) = channels(p);
+        prefix[y + 1] = prefix[y] + skyness(p);
+        blue[y + 1] = blue[y] + (b - red) as f64;
     }
     let mean = |a: usize, b: usize| (prefix[b] - prefix[a]) / (b - a) as f64;
     let step = |y: usize| mean(y.saturating_sub(k), y) - mean(y, (y + k).min(h));
+    let blue_mean = |a: usize, b: usize| (blue[b] - blue[a]) / (b - a) as f64;
+    // Sky to land loses blueness (blue sky to warm rock, grey sky to hazy blue mountains); bright
+    // cloud to dark cloud only loses brightness.
+    let bluer_above = |y: usize| {
+        blue_mean(y.saturating_sub(k), y) - blue_mean(y, (y + k).min(h)) >= MIN_BLUE_DROP
+    };
     let rows = edge..=h - edge;
     // Land stays land: below a real ridge the next fifth of the box is still clearly darker
     // than the sky above it. Below a dark cloud band the sky comes back, so it does not count.
     let run = (h / 5).max(k);
     let stays =
         |y: usize| mean(y, (y + run).min(h)) <= mean(y.saturating_sub(k), y) - MIN_STEP / 2.0;
-    let first = rows.clone().find(|&y| step(y) >= MIN_STEP && stays(y))?;
+    let ridge = |y: usize| step(y) >= MIN_STEP && stays(y);
+    let first = rows.clone().find(|&y| ridge(y))?;
+    // Under grey sky, a step that keeps its blueness may be a cloud edge with the ridge just
+    // below it; take the next step within `k` rows that does lose blueness. Any farther and it
+    // reaches trees below shaded, blue-grey mountains.
+    let first = if bluer_above(first) || blue_mean(first.saturating_sub(k), first) >= BLUE_SKY {
+        first
+    } else {
+        (first + 1..=(first + k).min(h - edge))
+            .find(|&y| ridge(y) && bluer_above(y))
+            .unwrap_or(first)
+    };
     let row = (first..=(first + k).min(h - edge)).max_by(|&a, &b| step(a).total_cmp(&step(b)))?;
     // A "ridge" in the bottom 5% of the box is whatever the box's lower edge cut through, such
     // as tree tops; the column has no ridge the tracer can see.
@@ -221,7 +254,10 @@ pub fn trace_region(img: &Image, region: Region) -> Vec<Pixel> {
         return Vec::new();
     };
     let raw: Vec<Option<usize>> = (r.x0..r.x1).map(|x| step_row(img, x, r)).collect();
-    fill_median(&despike(&raw, 70, 50), 8)
+    // The spike window grows with the width traced, so a false plateau a few percent of the
+    // frame wide (a dark cloud, a pole and its wires) is outvoted by the ridge on either side.
+    let radius = (raw.len() / 16).max(70);
+    fill_median(&despike(&raw, radius, 50), 8)
         .iter()
         .enumerate()
         .filter_map(|(x, y)| {
@@ -232,6 +268,45 @@ pub fn trace_region(img: &Image, region: Region) -> Vec<Pixel> {
             })
         })
         .collect()
+}
+
+/// How jagged a traced line is: the mean jump in rows between neighbouring columns. A ridge
+/// changes a few rows per column; a trace flipping between the ridge and rock below it jumps by
+/// hundreds.
+#[must_use]
+pub fn roughness(line: &[Pixel]) -> f64 {
+    if line.len() < 2 {
+        return f64::INFINITY;
+    }
+    let total: f64 = line.windows(2).map(|w| (w[1].y - w[0].y).abs()).sum();
+    total / (line.len() - 1) as f64
+}
+
+/// The skyline of the whole photo: the colour-rule trace (`trace`) or the step trace over the
+/// whole frame (`trace_region`), whichever is smoother. They fail differently. The colour
+/// rules call bright grey rock under white cloud "haze" in some columns and not others, so their
+/// line zigzags between the ridge and the rock below; the step trace can jump to a dark cloud or
+/// a wire. On a clean ridge both are smooth and the colour trace, which the bench was tuned on,
+/// is kept unless the step trace is clearly smoother.
+#[must_use]
+pub fn trace_best(img: &Image, cfg: &SkyConfig) -> Vec<Pixel> {
+    let colour = trace(img, cfg);
+    let steps = trace_region(
+        img,
+        Region {
+            x0: 0,
+            y0: 0,
+            x1: img.width,
+            y1: img.height,
+        },
+    );
+    // The step trace must also cover most of what the colour trace does, so a short clean
+    // stretch does not win over a full ridge.
+    if steps.len() * 10 >= colour.len() * 8 && roughness(&steps) * 2.0 < roughness(&colour) {
+        steps
+    } else {
+        colour
+    }
 }
 
 /// About `target` points, evenly spaced along the skyline.

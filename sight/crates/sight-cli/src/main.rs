@@ -269,7 +269,7 @@ fn photo(
     let img = sight_io::read_image(image)?;
     let line = match skyline {
         Some(p) => sight_io::read_skyline(p)?,
-        None => sky::trace(&img, &cfg.sky),
+        None => sky::trace_best(&img, &cfg.sky),
     };
     let sampled = sky::decimate(&line, cfg.sky.columns);
     Ok((
@@ -477,7 +477,7 @@ fn ridges(grid: &Path, cameras: &Path, out: &Path) -> Result<()> {
 
 fn trace(image: &Path) -> Result<()> {
     let img = sight_io::read_image(image)?;
-    let line = sky::trace(&img, &Config::default().sky);
+    let line = sky::trace_best(&img, &Config::default().sky);
     println!(
         "width {} height {} points {}",
         img.width,

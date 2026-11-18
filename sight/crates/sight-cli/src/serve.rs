@@ -200,7 +200,7 @@ fn trace(bytes: &[u8], state: &mut State) -> Result<Reply> {
         }
     };
     let fov = decoded.fov.or_else(|| sight_io::exif_fov(bytes));
-    let traced = sky::trace(&decoded.image, &Config::default().sky);
+    let traced = sky::trace_best(&decoded.image, &Config::default().sky);
     let reply = Traced {
         id,
         width: decoded.image.width as u32,
