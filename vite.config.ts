@@ -1,3 +1,4 @@
+import { autoPort } from "@bridgerb/port-from-name";
 import adapter from "@sveltejs/adapter-cloudflare";
 import { enhancedImages } from "@sveltejs/enhanced-img";
 import { sveltekit } from "@sveltejs/kit/vite";
@@ -15,6 +16,7 @@ export default defineConfig({
 			},
 			adapter: adapter(),
 		}),
+		autoPort(),
 	],
 	test: {
 		expect: { requireAssertions: true },

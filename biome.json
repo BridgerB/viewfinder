@@ -12,7 +12,9 @@
 			"!worker-configuration.d.ts",
 			"!**/*.md",
 			"!src/lib/assets/*.json",
-			"!sight/tests/fixtures"
+			"!sight/tests/fixtures",
+			"!drizzle",
+			"!src/lib/server/db/auth.schema.ts"
 		]
 	},
 	"formatter": {

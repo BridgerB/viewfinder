@@ -18,6 +18,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.6.8
         version: 2.6.8
+      '@bridgerb/port-from-name':
+        specifier: ^1.0.1
+        version: 1.0.1(vite@8.3.8(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
       '@playwright/test':
         specifier: ^1.65.1
         version: 1.65.1
@@ -390,6 +393,15 @@ packages:
 
   '@blazediff/core@1.10.0':
     resolution: {integrity: sha512-AOQff0zgR7cGsZL+4E7hVkmujoPUpm0J9xzWGWZj5wCjd3gmxESXAPfKyuzs93VdpQNFhHlBhfOjrcZ+XTERtQ==}
+
+  '@bridgerb/port-from-name@1.0.1':
+    resolution: {integrity: sha512-kWvViJSX+NEyIDQavq2tkeOuPvZFxil84qFB2+5W61tmQuGse0XOqQ735YZFe2XPE7qmWnGFJvLNeojMyHBNxQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      vite: '>=5'
+    peerDependenciesMeta:
+      vite:
+        optional: true
 
   '@chevrotain/cst-dts-gen@12.0.0':
     resolution: {integrity: sha512-fSL4KXjTl7cDgf0B5Rip9Q05BOrYvkJV/RrBTE/bKDN096E4hN/ySpcBK5B24T76dlQ2i32Zc3PAE27jFnFrKg==}
@@ -2721,6 +2733,10 @@ snapshots:
     optional: true
 
   '@blazediff/core@1.10.0': {}
+
+  '@bridgerb/port-from-name@1.0.1(vite@8.3.8(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))':
+    optionalDependencies:
+      vite: 8.3.8(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)
 
   '@chevrotain/cst-dts-gen@12.0.0':
     dependencies:
