@@ -12,12 +12,12 @@
 		"build": "wrangler types --check --include-main-module=false && vite build",
 		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
 		"prepare": "svelte-kit sync || echo ''",
-		"check": "wrangler types --check --include-main-module=false && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check": "wrangler types --check --include-main-module=false && wrangler types --check -c cloud/sight/wrangler.jsonc cloud/sight/worker-configuration.d.ts --include-main-module=false && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p cloud/sight",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
 		"test:e2e": "playwright install && playwright test",
-		"gen": "wrangler types --include-main-module=false",
+		"gen": "wrangler types --include-main-module=false && wrangler types -c cloud/sight/wrangler.jsonc cloud/sight/worker-configuration.d.ts --include-main-module=false",
 		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
@@ -26,7 +26,9 @@
 		"lint": "biome check",
 		"format": "biome format --write",
 		"sight": "sight/target/release/sight serve data/elevation/envi/n41w112 data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn --host 0.0.0.0",
-		"sight:build": "cargo build --release --manifest-path sight/Cargo.toml"
+		"sight:build": "cargo build --release --manifest-path sight/Cargo.toml",
+		"deploy:sight": "wrangler deploy -c cloud/sight/wrangler.jsonc",
+		"deploy": "pnpm build && wrangler deploy"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.6.8",

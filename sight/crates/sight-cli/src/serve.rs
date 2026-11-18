@@ -124,7 +124,10 @@ fn route(
         (Method::Options, _) => Ok(cors(Response::from_data(Vec::new()).with_status_code(204))),
         (Method::Get, "/health") => Ok(json(
             200,
-            &serde_json::json!({ "places": fields.iter().map(Field::len).sum::<usize>() }),
+            &serde_json::json!({
+                "places": fields.iter().map(Field::len).sum::<usize>(),
+                "threads": rayon::current_num_threads(),
+            }),
         )),
         (Method::Post, "/trace") => {
             let bytes = body(req)?;
@@ -164,7 +167,7 @@ fn trace(bytes: &[u8], state: &mut State) -> Result<Reply> {
     let decoded = match sight_io::decode_photo(bytes) {
         Ok(d) => d,
         Err(direct) => {
-            via_sips(bytes, id).with_context(|| format!("cannot read the photo ({direct})"))?
+            via_converter(bytes, id).with_context(|| format!("cannot read the photo ({direct})"))?
         }
     };
     let fov = decoded.fov.or_else(|| sight_io::exif_fov(bytes));
@@ -191,27 +194,32 @@ fn trace(bytes: &[u8], state: &mut State) -> Result<Reply> {
     Ok(json(200, &reply))
 }
 
-/// HEIC and anything else the image crate cannot read, converted to JPEG by macOS `sips`.
-/// Local-only: a hosted server needs its own HEIC decoder.
-fn via_sips(bytes: &[u8], tag: u64) -> Result<sight_io::Decoded> {
-    if !cfg!(target_os = "macos") {
-        bail!("only JPEG and PNG are supported here");
-    }
+/// HEIC and anything else the image crate cannot read, converted to JPEG by an outside tool:
+/// `sips` on macOS, libheif's `heif-convert` elsewhere (the container installs it). Both write
+/// the picture upright with the EXIF orientation reset, so it is not rotated twice.
+fn via_converter(bytes: &[u8], tag: u64) -> Result<sight_io::Decoded> {
     let dir = std::env::temp_dir();
     let src = dir.join(format!("sight-upload-{}-{tag}", std::process::id()));
     let out = src.with_extension("jpg");
     std::fs::write(&src, bytes)?;
-    let run = std::process::Command::new("/usr/bin/sips")
-        .args(["-s", "format", "jpeg"])
-        .arg(&src)
-        .arg("--out")
-        .arg(&out)
-        .output();
+    let mut command = if cfg!(target_os = "macos") {
+        let mut c = std::process::Command::new("/usr/bin/sips");
+        c.args(["-s", "format", "jpeg"])
+            .arg(&src)
+            .arg("--out")
+            .arg(&out);
+        c
+    } else {
+        let mut c = std::process::Command::new("heif-convert");
+        c.args(["-q", "92"]).arg(&src).arg(&out);
+        c
+    };
+    let run = command.output();
     let _ = std::fs::remove_file(&src);
     let ok = run.is_ok_and(|o| o.status.success());
     let jpeg = if ok { std::fs::read(&out).ok() } else { None };
     let _ = std::fs::remove_file(&out);
-    let jpeg = jpeg.context("not an image sips can convert")?;
+    let jpeg = jpeg.context("not an image this server can convert (JPEG, PNG or HEIC)")?;
     Ok(sight_io::decode_photo(&jpeg)?)
 }
 

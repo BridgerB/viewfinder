@@ -12,7 +12,17 @@
 	"preview_urls": true,
 	"d1_databases": [
 		{
-			"binding": "DB"
+			"binding": "DB",
+			"database_name": "viewfinder",
+			"database_id": "ddad20a8-8da3-4942-932d-f26b699649a9",
+			"migrations_dir": "drizzle"
+		}
+	],
+	// The locator's container Worker (cloud/sight); /api/sight/* forwards to it.
+	"services": [
+		{
+			"binding": "SIGHT",
+			"service": "viewfinder-sight"
 		}
 	]
 }

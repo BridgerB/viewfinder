@@ -41,8 +41,8 @@ type Located = {
 	counts: number[];
 };
 
-/** The locator runs beside the dev server, on the next port, on the same host. */
-const apiBase = (hostname: string) => `http://${hostname}:4373`;
+/** The locator, same-origin: the site forwards /api/sight/* to it (see the route's comment). */
+const API = "/api/sight";
 
 const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
@@ -110,4 +110,4 @@ const svgPoints = (points: readonly Point[]) =>
 	points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
 
 export type { LatLon, Located, Place, Point, Traced, Verdict };
-export { apiBase, kmBetween, parseFov, spreadKm, svgPoints, verdict };
+export { API, kmBetween, parseFov, spreadKm, svgPoints, verdict };

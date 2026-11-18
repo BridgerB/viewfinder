@@ -1,0 +1,29 @@
+{
+	// The locator (`sight serve`) in a Cloudflare Container. The site reaches it only through the
+	// SIGHT service binding in the root wrangler.jsonc, so it has no public URL of its own.
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "viewfinder-sight",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-11-18",
+	"workers_dev": false,
+	"preview_urls": false,
+	"observability": { "enabled": true },
+	"containers": [
+		{
+			"class_name": "Sight",
+			"scheduling_policy": "durable_object",
+			"images": {
+				"base": {
+					"dockerfile": "./Dockerfile",
+					"build_context": "../.."
+				}
+			}
+		}
+	],
+	"durable_objects": {
+		"bindings": [{ "name": "SIGHT", "class_name": "Sight" }]
+	},
+	"exports": {
+		"Sight": { "type": "durable-object", "storage": "sqlite" }
+	}
+}

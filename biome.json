@@ -9,7 +9,7 @@
 		"ignoreUnknown": false,
 		"includes": [
 			"**",
-			"!worker-configuration.d.ts",
+			"!**/worker-configuration.d.ts",
 			"!**/*.md",
 			"!src/lib/assets/*.json",
 			"!sight/tests/fixtures",

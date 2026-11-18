@@ -1,0 +1,10 @@
+# The container image (cloud/sight/Dockerfile) needs only the Rust sources and the grid and
+# fields; everything else would only slow the build context down.
+*
+!sight/
+sight/target/
+sight/.cpcache/
+!data/elevation/envi/n41w112
+!data/elevation/envi/n41w112.hdr
+!data/elevation/field/n41w112.hzn
+!data/elevation/field/n41w112-rough500.hzn

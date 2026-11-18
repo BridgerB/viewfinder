@@ -34,6 +34,15 @@ The base also carries the `sv` add-on demos: Better Auth on D1 via Drizzle (`src
 
 The Worker bundle includes the imported JSON: `timpanogos.json` (4.2 MB) is the bulk of an ~885 KiB gzipped upload (`pnpm exec wrangler deploy --dry-run` prints the size; the free-plan limit is 3 MiB).
 
+## Deployment
+
+Two Workers on Cloudflare (Workers Paid):
+
+- `viewfinder` (root `wrangler.jsonc`): the site, at https://viewfinder.bridgerb.workers.dev. Meant to deploy from GitHub via Workers Builds (build `pnpm build`, deploy `pnpm exec wrangler deploy`); by hand it is `pnpm deploy`. Bindings: D1 `viewfinder` (migrations in `drizzle/`, applied with `wrangler d1 migrations apply DB --remote`), and the service binding `SIGHT`. Secrets `ORIGIN` and `BETTER_AUTH_SECRET` are set with `wrangler secret put`.
+- `viewfinder-sight` (`cloud/sight/`): the locator. A Durable Object starts one container running `sight serve` (standard-4: 4 vCPU, 12 GiB), waits for `/health`, forwards requests, and lets it stop after 15 idle minutes; a cold start takes about 5 s. It has no public URL (`workers_dev: false`); the site's `/api/sight/*` route forwards to it, and in `pnpm dev` the same route forwards to `pnpm sight` on port 4373. Deploy it by hand with `pnpm deploy:sight` (Docker running): the image bakes in the grid and fields from the gitignored `data/`, so it cannot build from Git. A running container keeps its old image until it next stops.
+
+The image (`cloud/sight/Dockerfile`, context = repo root, filtered by `/.dockerignore`) cross-compiles `sight` to x86-64 with `target-cpu=x86-64-v3`: without FMA, every `mul_add` in the screen becomes a software call and a search takes ~36 s. HEIC uploads are converted by libheif's `heif-convert` in the container (`sips` locally).
+
 ## Locator commands
 
 Run from the repository root; build once with `cargo build --release` in `sight/`. `GRID` is the ENVI path _without_ `.hdr`.

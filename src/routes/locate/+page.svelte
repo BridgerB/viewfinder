@@ -2,7 +2,7 @@
 import { onDestroy, onMount, tick } from "svelte";
 import LocateMap from "#lib/LocateMap.svelte";
 import {
-	apiBase,
+	API,
 	kmBetween,
 	type Located,
 	type Point,
@@ -12,6 +12,7 @@ import {
 	type Traced,
 	verdict,
 } from "#lib/locate.ts";
+import { dev } from "$app/env";
 import { resolve } from "$app/paths";
 
 /** Where the locator server stands: unknown until the first check. */
@@ -46,20 +47,24 @@ const coords = $derived(
 	result ? `${result.best.lat.toFixed(5)}, ${result.best.lon.toFixed(5)}` : "",
 );
 
-const base = () => apiBase(window.location.hostname);
-
 const explain = (e: unknown) => {
 	if (e instanceof TypeError) {
 		server = "down";
-		return "The locator stopped answering. Start it again with: pnpm sight";
+		return dev
+			? "The locator stopped answering. Start it again with: pnpm sight"
+			: "The locator stopped answering. Try again in a moment.";
 	}
 	return e instanceof Error ? e.message : String(e);
 };
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
-	const res = await fetch(`${base()}${path}`, init);
-	const body = (await res.json()) as T & { error?: string };
-	if (!res.ok) throw new Error(body.error ?? res.statusText);
+	const res = await fetch(`${API}${path}`, init);
+	// A locator error is JSON with an `error`; a failed start or proxy error may be plain text.
+	const body = (await res.json().catch(() => ({}))) as T & { error?: string };
+	if (!res.ok)
+		throw new Error(
+			body.error ?? `The locator answered ${res.status} ${res.statusText}`,
+		);
 	return body;
 }
 
@@ -113,7 +118,7 @@ const start = async (file: Blob) => {
 	try {
 		const t = await call<Traced>("/trace", { method: "POST", body: file });
 		traced = t;
-		imageUrl = `${base()}/image/${t.id}`;
+		imageUrl = `${API}/image/${t.id}`;
 		fovText = t.fov ? t.fov.toFixed(1) : "";
 		await search(false);
 	} catch (e) {
@@ -206,8 +211,13 @@ const copy = async () => {
 	{#if server === "down"}
 		<div class="banner bad">
 			<div>
-				<strong>The locator isn't running.</strong> Start it in a terminal from the project folder:
-				<code>pnpm sight</code>
+				{#if dev}
+					<strong>The locator isn't running.</strong> Start it in a terminal from the project folder:
+					<code>pnpm sight</code>
+				{:else}
+					<strong>The locator is unavailable right now.</strong> It may still be starting; try again
+					in a few seconds.
+				{/if}
 			</div>
 			<button type="button" class="ghost" onclick={checkServer}>Check again</button>
 		</div>
@@ -249,6 +259,8 @@ const copy = async () => {
 				>
 				{#if server === "up"}
 					<p class="dim">Searches {places.toLocaleString()} places in about 2 seconds.</p>
+				{:else if server === "checking"}
+					<p class="dim">Starting the locator… the first visit after a while takes a few seconds.</p>
 				{/if}
 			</div>
 		</div>
