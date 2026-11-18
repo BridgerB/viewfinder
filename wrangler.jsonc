@@ -24,6 +24,13 @@
 			"migrations_dir": "drizzle"
 		}
 	],
+	// Photos of shared results, at photos/{share id}.jpg (rows in D1 table `share`).
+	"r2_buckets": [
+		{
+			"binding": "PHOTOS",
+			"bucket_name": "viewfinder-photos"
+		}
+	],
 	// The locator's container Worker (cloud/sight); /api/sight/* forwards to it.
 	"services": [
 		{

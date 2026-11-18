@@ -98,6 +98,16 @@ enum Cmd {
     },
     /// The traced skyline, as fractions of the frame.
     Trace { image: PathBuf },
+    /// The skyline traced inside a box (image pixels), optionally drawn onto a copy of the photo.
+    TraceBox {
+        image: PathBuf,
+        x0: usize,
+        y0: usize,
+        x1: usize,
+        y1: usize,
+        #[arg(long)]
+        overlay: Option<PathBuf>,
+    },
     /// Every known-location photograph searched, timed and checked against its truth.
     Bench {
         grid: PathBuf,
@@ -202,6 +212,14 @@ fn main() -> Result<()> {
         ),
         Cmd::Ridges { grid, cameras, out } => ridges(&grid, &cameras, &out),
         Cmd::Trace { image } => trace(&image),
+        Cmd::TraceBox {
+            image,
+            x0,
+            y0,
+            x1,
+            y1,
+            overlay,
+        } => trace_box(&image, sky::Region { x0, y0, x1, y1 }, overlay.as_deref()),
         Cmd::Bench {
             grid,
             fields,
@@ -473,6 +491,27 @@ fn trace(image: &Path) -> Result<()> {
             p.x / img.width as f64,
             p.y / img.height as f64
         );
+    }
+    Ok(())
+}
+
+fn trace_box(image: &Path, region: sky::Region, overlay: Option<&Path>) -> Result<()> {
+    let img = sight_io::read_image(image)?;
+    let line = sky::trace_region(&img, region);
+    let ys: Vec<f64> = line.iter().map(|p| p.y).collect();
+    let (lo, hi) = ys
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(a, b), &y| {
+            (a.min(y), b.max(y))
+        });
+    println!(
+        "points {} of {} columns, rows {lo:.0}..{hi:.0}",
+        line.len(),
+        region.x1 - region.x0
+    );
+    if let Some(out) = overlay {
+        sight_io::write_overlay(image, out, &line, &[])?;
+        println!("wrote {}", out.display());
     }
     Ok(())
 }

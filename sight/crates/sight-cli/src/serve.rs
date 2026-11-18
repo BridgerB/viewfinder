@@ -2,7 +2,9 @@
 //!
 //! The grid and fields are loaded once and stay in memory. A photo is uploaded once
 //! (`POST /trace`) and kept, as its upright JPEG and traced skyline, under an id; searches
-//! (`POST /locate`) then name that id and may send a hand-drawn skyline and a lens width.
+//! (`POST /locate`) then name that id and may send a lens width. `POST /retrace` with a box
+//! retraces the skyline inside it (for photos where trees or poles fool the whole-photo trace),
+//! and searches use that skyline from then on.
 //! Requests are served one at a time; each search uses every core.
 
 use std::collections::BTreeMap;
@@ -38,7 +40,25 @@ struct Upload {
     jpeg: Vec<u8>,
     width: u32,
     height: u32,
+    /// The whole-photo trace.
     traced: Vec<Pixel>,
+    /// The skyline a search uses: the whole-photo trace, or the trace inside the box last given
+    /// to /retrace.
+    current: Vec<Pixel>,
+}
+
+#[derive(Deserialize)]
+struct RetraceRequest {
+    id: u64,
+    /// [x0, y0, x1, y1] in image pixels: trace only inside it. Absent: back to the whole photo.
+    crop: Option<[f64; 4]>,
+}
+
+#[derive(Serialize)]
+struct Retraced {
+    skyline: Vec<[f64; 2]>,
+    /// Points the trace found, before thinning for drawing.
+    points: usize,
 }
 
 #[derive(Serialize)]
@@ -102,8 +122,12 @@ pub fn serve(grid: &Path, fields: &str, host: &str, port: u16) -> Result<()> {
             eprintln!("{} {}: {e:#}", req.method(), req.url());
             json(500, &serde_json::json!({ "error": format!("{e:#}") }))
         });
-        // A client that went away cannot be answered; the next request is unaffected.
-        let _ = req.respond(reply);
+        // Writing happens on its own thread: a client that stops reading (a browser that dropped
+        // an image download, say) blocks only that write, never the next request. A client that
+        // went away cannot be answered, so the result of the write is ignored.
+        std::thread::spawn(move || {
+            let _ = req.respond(reply);
+        });
     }
     Ok(())
 }
@@ -140,6 +164,11 @@ fn route(
                 cors(Response::from_data(upload.jpeg.clone())),
                 "image/jpeg",
             ))
+        }
+        (Method::Post, "/retrace") => {
+            let ask: RetraceRequest =
+                serde_json::from_slice(&body(req)?).context("bad retrace request")?;
+            retrace(&ask, state)
         }
         (Method::Post, "/locate") => {
             let ask: LocateRequest =
@@ -185,6 +214,7 @@ fn trace(bytes: &[u8], state: &mut State) -> Result<Reply> {
             jpeg: decoded.jpeg,
             width: reply.width,
             height: reply.height,
+            current: traced.clone(),
             traced,
         },
     );
@@ -223,6 +253,42 @@ fn via_converter(bytes: &[u8], tag: u64) -> Result<sight_io::Decoded> {
     Ok(sight_io::decode_photo(&jpeg)?)
 }
 
+/// Retraces an upload inside a box (or the whole photo again) and makes that the skyline
+/// searches use. The pixels are not kept between requests, so the stored JPEG is decoded again.
+fn retrace(ask: &RetraceRequest, state: &mut State) -> Result<Reply> {
+    let upload = state
+        .uploads
+        .get_mut(&ask.id)
+        .context("that upload has expired; upload the photo again")?;
+    upload.current = match ask.crop {
+        None => upload.traced.clone(),
+        Some([x0, y0, x1, y1]) => {
+            let decoded = sight_io::decode_photo(&upload.jpeg)?;
+            let corner = |v: f64| v.max(0.0).round() as usize;
+            let region = sky::Region {
+                x0: corner(x0.min(x1)),
+                y0: corner(y0.min(y1)),
+                x1: corner(x0.max(x1)),
+                y1: corner(y0.max(y1)),
+            };
+            let line = sky::trace_region(&decoded.image, region);
+            if line.len() < 24 {
+                bail!(
+                    "no mountain ridge found inside that box; make it wider and include some sky above the ridge"
+                );
+            }
+            line
+        }
+    };
+    Ok(json(
+        200,
+        &Retraced {
+            skyline: points(&sky::decimate(&upload.current, DRAW_POINTS)),
+            points: upload.current.len(),
+        },
+    ))
+}
+
 fn locate(
     ask: &LocateRequest,
     dem: &sight_core::dem::Dem<'_>,
@@ -240,7 +306,7 @@ fn locate(
     };
     let line: Vec<Pixel> = match &ask.skyline {
         Some(drawn) => densify(drawn),
-        None => upload.traced.clone(),
+        None => upload.current.clone(),
     };
     if line.len() < 24 {
         bail!("the skyline has too few points to place a camera");
