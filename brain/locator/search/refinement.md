@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/search.rs#pub fn search(dem: &Dem<'_>, fields: &[Field], photo: &Photo, cfg: &Config, timer: &mut impl Timer) -> Found {
   - sight/crates/sight-core/src/search.rs#fn neighbourhood(rows: &[Place], top: usize, step_m: f64, reach_m: f64) -> Vec<(f64, f64)> {

@@ -1,7 +1,7 @@
 ---
 type: how-to
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-cli/src/main.rs#/// Every place within REACH m of LAT LON, STEP m apart, scored against the photograph.
   - sight/crates/sight-cli/src/main.rs#/// The traced skyline, as fractions of the frame.

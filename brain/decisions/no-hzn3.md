@@ -1,7 +1,7 @@
 ---
 type: decision
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/PERF.md#Loading the DEM (memory-mapped, zero-copy) and both fields takes 0.02 s
   - sight/crates/sight-core/src/field.rs#pub fn parse(bytes: &[u8]) -> Result<Self, FieldError> {

@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/camera.rs#pub fn outline(angles: &[i16], pose: Pose, width: f64, height: f64) -> Vec<(f64, f64)> {
   - sight/crates/sight-core/src/camera.rs#fn outline_inverts_ray() {

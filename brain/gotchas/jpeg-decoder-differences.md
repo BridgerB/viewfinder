@@ -1,7 +1,7 @@
 ---
 type: gotcha
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/PERF.md#JPEG decoding is the one input difference
   - sight/crates/sight-cli/src/main.rs#fn compare_trace(image: &Path, skyline: &Path) -> Result<()> {

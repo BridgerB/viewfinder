@@ -1,7 +1,7 @@
 ---
 type: decision
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/PERF.md#A fixed 3° step lost the 27° telephoto Daybreak photo (39 km off); a 1° step at 27° keeps it.
   - sight/crates/sight-core/src/config.rs#pub yaw_span: i64,

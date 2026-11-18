@@ -1,7 +1,7 @@
 ---
 type: concept
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/src/viewfinder/score.clj#A narrower lens shrinks a farther copy of the ridge until the relief matches.
   - sight/crates/sight-core/src/camera.rs#pub fn focal(width: f64, fov: f64) -> f64 {

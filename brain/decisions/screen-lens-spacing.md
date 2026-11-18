@@ -1,7 +1,7 @@
 ---
 type: decision
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/PERF.md#A 52° photo screened with 40°/55° templates and lost its place (library 68 km off).
   - sight/crates/sight-core/src/screen.rs#if score.fovs.len() <= 3 { score.fovs.clone() } else { score.fovs.iter().step_by(2).copied().collect() };

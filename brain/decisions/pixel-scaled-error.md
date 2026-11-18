@@ -1,7 +1,7 @@
 ---
 type: decision
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/config.rs#The trimmed error is counted as if the frame spanned this many degrees: a trace is off
   - sight/crates/sight-core/src/score.rs#let lens_scale = cfg.ref_fov / lens.fov - 1.0;

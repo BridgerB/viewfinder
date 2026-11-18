@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/camera.rs#pub fn ray(width: f64, height: f64, f: f64, roll: f64, pitch: f64, x: f64, y: f64) -> (f64, f64) {
   - sight/crates/sight-core/src/camera.rs#pub fn focal(width: f64, fov: f64) -> f64 {

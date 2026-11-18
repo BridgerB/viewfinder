@@ -1,7 +1,7 @@
 ---
 type: gotcha
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/PERF.md#Tilted screen templates.
   - sight/PERF.md#Roll in the screen.

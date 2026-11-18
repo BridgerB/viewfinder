@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/horizon.rs#fn walk(&self, dem: &Dem<'_>, cfg: &HorizonConfig, azimuth: usize) -> (f64, f64) {
   - sight/crates/sight-core/src/horizon.rs#let slope = ((f64::from(z) - self.eye) - drop) / d;

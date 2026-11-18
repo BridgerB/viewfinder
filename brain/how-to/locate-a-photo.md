@@ -1,7 +1,7 @@
 ---
 type: how-to
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-cli/src/main.rs#/// Where a photograph was taken: writes the heatmap and the winning camera's horizon.
   - sight/crates/sight-io/src/lib.rs#pub fn write_surface(path: &Path, rows: &[Place]) -> Result<(), IoError> {

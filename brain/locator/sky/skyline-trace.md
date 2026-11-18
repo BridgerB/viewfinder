@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/sky.rs#fn is_sky(r: i64, g: i64, b: i64) -> bool {
   - sight/crates/sight-core/src/sky.rs#fn is_haze(r: i64, g: i64, b: i64) -> bool {

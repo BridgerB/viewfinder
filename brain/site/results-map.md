@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - src/lib/ResultsMap.svelte#.bindTooltip('The ridge its skyline sits on')
   - src/lib/ResultsMap.svelte#map.fitBounds(

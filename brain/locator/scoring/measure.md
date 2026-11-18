@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/score.rs#pub fn measure(
   - sight/crates/sight-core/src/score.rs#fn angle_at(angles: &[i16], azimuth: f64) -> Option<f64> {

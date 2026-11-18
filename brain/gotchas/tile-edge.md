@@ -1,7 +1,7 @@
 ---
 type: gotcha
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - data/elevation/envi/n41w112.hdr#map info = {Geographic Lat/Lon, 1, 1, -112.000555556193
   - sight/bench/cases.toml#truth = [40.55505, -112.00346]

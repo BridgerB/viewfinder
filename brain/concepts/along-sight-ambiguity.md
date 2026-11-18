@@ -1,7 +1,7 @@
 ---
 type: concept
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/score.rs#One step of the coarse field of view moves the relief by about this much; a gap inside
   - sight/crates/sight-core/src/config.rs#Lens widths tried when the lens is unknown: a 50 mm lens through a phone's ultrawide.

@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-cli/src/main.rs#fn bench(grid: &Path, fields: &str, cases: &Path, quick: bool, runs: &Path) -> Result<()> {
   - sight/crates/sight-cli/src/main.rs#fn first_within(truth: [f64; 2], points: impl Iterator<Item = [f64; 2]>) -> Option<usize> {

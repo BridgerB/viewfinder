@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/search.rs#pub fn rank(field: &Field, dem: &Dem<'_>, prep: &Prepared, cfg: &Config) -> (Vec<Place>, Vec<ScreenRow>) {
   - sight/crates/sight-core/src/config.rs#keep_share: 0.03,

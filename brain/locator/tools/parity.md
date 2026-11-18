@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/PERF.md#Parity with the Clojure version:
   - sight/crates/sight-cli/src/main.rs#fn golden(grid: &Path, field_path: &Path, image: &Path, golden: &Path, skyline: Option<&Path>) -> Result<()> {

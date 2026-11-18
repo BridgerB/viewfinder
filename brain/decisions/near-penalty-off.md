@@ -1,7 +1,7 @@
 ---
 type: decision
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/config.rs#Degrees added when the rest of the window is near ground. Off: it sent a canyon-mouth
   - sight/crates/sight-core/src/config.rs#near_weight: 0.0,

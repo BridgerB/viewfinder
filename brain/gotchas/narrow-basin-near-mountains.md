@@ -1,7 +1,7 @@
 ---
 type: gotcha
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - CLAUDE.md#Near mountains the good fit is only ~125 m wide, so the 2 km field alone misses it
   - sight/crates/sight-core/src/field.rs#Whether the ground within `radius_m` of the place spans at least `relief_m`

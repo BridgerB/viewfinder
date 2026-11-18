@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/screen.rs#pub fn fill(&mut self, angles: &[i16]) {
   - sight/crates/sight-core/src/screen.rs#let sk = (s.pj[end] - s.pj[b]) - b as f64 * s1;

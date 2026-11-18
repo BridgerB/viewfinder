@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/dem.rs#pub const NODATA: i16 = i16::MIN;
   - sight/crates/sight-core/src/dem.rs#pub fn elev_at(&self, lat: f64, lon: f64) -> Option<f64> {

@@ -1,7 +1,7 @@
 ---
 type: concept
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/src/viewfinder/main.clj#The search is the field. Nothing in here names a town or a summit.
   - sight/crates/sight-core/src/search.rs#pub fn search(dem: &Dem<'_>, fields: &[Field], photo: &Photo, cfg: &Config, timer: &mut impl Timer) -> Found {

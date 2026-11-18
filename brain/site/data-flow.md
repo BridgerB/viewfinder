@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-io/src/lib.rs#/// Every scored place as `[{"lat","lon","loss"}]`, the heatmap the match page draws.
   - sight/crates/sight-io/src/lib.rs#/// Ridges per camera id as `{"id":[[lat,lon],…]}`.

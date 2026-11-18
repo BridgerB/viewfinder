@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-cli/src/main.rs#enum Cmd {
   - sight/crates/sight-cli/src/main.rs#fn photo(image: &Path, skyline: Option<&Path>, cfg: &Config) -> Result<(Photo, Vec<sight_core::camera::Pixel>)> {

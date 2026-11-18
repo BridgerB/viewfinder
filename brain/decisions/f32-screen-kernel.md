@@ -1,7 +1,7 @@
 ---
 type: decision
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/PERF.md#`dot32`: f32 lanes, summed to f64
   - sight/crates/sight-core/src/screen.rs#let cross = dot32(&tpl.elevs32, &s.e32, b);

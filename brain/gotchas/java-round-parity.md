@@ -1,7 +1,7 @@
 ---
 type: gotcha
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/java.rs#pub fn round(x: f64) -> i64 {
   - sight/crates/sight-core/src/field.rs#reason = "the reference computes (a + b) / 2; the lattice must land on the same bits"

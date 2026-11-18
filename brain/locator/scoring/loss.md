@@ -1,7 +1,7 @@
 ---
 type: area
 status: verified
-verifiedAgainst: 244c568 + uncommitted Rust port, 2026-11-18
+verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
   - sight/crates/sight-core/src/score.rs#let loss = rmse + scale + 2.0 * (1.0 - corr) + cfg.near_weight * slope + cfg.floor_weight * (floor / k);
   - sight/crates/sight-core/src/score.rs#let scale = ((hsigma.max(1.0e-3) / gsigma.max(1.0e-3)).ln().abs() - 0.10).max(0.0);
