@@ -3,7 +3,8 @@
    ground reaches, with the earth's curve taken off. Azimuth 0 is north and angles run clockwise.
    The walk samples the nearest cell. A horizon is one place, so the field builds them as a wave
    of places rather than a wave of rays."
-  (:require [viewfinder.dem :as dem]))
+  (:require [viewfinder.dem :as dem]
+            [viewfinder.trace :as trace]))
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
@@ -15,19 +16,21 @@
 (def max-distance-m 50000.0)          ; past this a ridge is haze, not a skyline
 (def step-deg 0.4)                    ; each step along a ray subtends about this much
 (def radius-m (/ (* 6371000.0 7.0) 6.0)) ; earth radius plus the usual refraction (about 13%)
-(def missing Short/MIN_VALUE)         ; a ray that never touched ground; not a real angle
+(def ^:const missing (long Short/MIN_VALUE)) ; a ray that never touched ground; not a real angle
 
 (defn- opt
   [opts k default]
   (if (contains? opts k) (get opts k) default))
 
 (defn- walk-angle
-  "The winning sample along one azimuth: elevation angle in degrees, and meters from the camera.
-   [NaN 0] when the ray never touches ground. lat-m and lon-m are meters per degree at the
-   observer. The walk starts at min-m so a berm beside the camera cannot hide the ridge. The grid
-   fields are read here, once per ray: a primitive function cannot take the cell coordinates as
+  "The winning sample along one azimuth, written to out: elevation angle in degrees at 0, meters
+   from the camera at 1. NaN and 0 when the ray never touches ground. lat-m and lon-m are meters
+   per degree at the observer. The walk starts at min-m so a berm beside the camera cannot hide
+   the ridge. It compares slopes, rise over run, not angles: atan only increases, so the winner
+   is the same, and the one atan is taken at the end instead of two per step. The grid fields
+   are read here, once per ray: a primitive function cannot take the cell coordinates as
    arguments."
-  [grid lat lon azimuth eye-z lat-m lon-m min-m max-m radius growth]
+  [grid lat lon azimuth eye-z lat-m lon-m min-m max-m radius growth ^doubles out]
   (let [^shorts samples (:dem/samples grid)
         width (long (:dem/width grid))
         height (long (:dem/height grid))
@@ -50,25 +53,24 @@
         gap (long dem/nodata)
         max-ground (double max-ground-m)]
     (loop [d min-m best ##-Inf best-d 0.0 hit false]
-      (if (> d max-m)
-        (if hit [best best-d] [Double/NaN 0.0])
+      (if (or (> d max-m)
+              (and hit (< (/ (- (- max-ground eye-z) (/ (* d d) (* 2.0 radius))) d) best)))
+        (do (aset out 0 (if hit (Math/toDegrees (Math/atan best)) Double/NaN))
+            (aset out 1 (if hit best-d 0.0)))
         (let [drop (/ (* d d) (* 2.0 radius))
-              ceiling (Math/toDegrees (Math/atan2 (- (- max-ground eye-z) drop) d))]
-          (if (and hit (< ceiling best))
-            [best best-d]
-            (let [lat2 (+ lat (/ (* d north-u) lat-m))
-                  lon2 (+ lon (/ (* d east-u) lon-m))
-                  col (Math/round (/ (- lon2 west) dx))
-                  row (Math/round (/ (- lat2 north) dy))
-                  z (if (or (neg? col) (neg? row) (>= col width) (>= row height))
-                      gap
-                      (long (aget samples (int (+ (* row width) col)))))]
-              (if (== z gap)
-                (recur (* d growth) best best-d hit)
-                (let [ang (Math/toDegrees (Math/atan2 (- (- (double z) eye-z) drop) d))]
-                  (if (> ang best)
-                    (recur (* d growth) ang d true)
-                    (recur (* d growth) best best-d true)))))))))))
+              lat2 (+ lat (/ (* d north-u) lat-m))
+              lon2 (+ lon (/ (* d east-u) lon-m))
+              col (Math/round (/ (- lon2 west) dx))
+              row (Math/round (/ (- lat2 north) dy))
+              z (if (or (neg? col) (neg? row) (>= col width) (>= row height))
+                  gap
+                  (long (aget samples (int (+ (* row width) col)))))]
+          (if (== z gap)
+            (recur (* d growth) best best-d hit)
+            (let [slope (/ (- (- (double z) eye-z) drop) d)]
+              (if (> slope best)
+                (recur (* d growth) slope d true)
+                (recur (* d growth) best best-d true)))))))))
 
 (defn- centi
   [degrees]
@@ -84,6 +86,7 @@
   ([grid lat lon] (view grid lat lon {}))
   ([grid lat lon opts]
    (when-let [ground (dem/elev-at grid lat lon)]
+     (trace/bump :horizons)
      (let [eye (+ (double (opt opts :eye-m eye-m)) (double ground))
            lat-m 111320.0
            lon-m (* 111320.0 (Math/cos (Math/toRadians lat)))
@@ -93,11 +96,12 @@
            max-m (double (opt opts :max-m max-distance-m))
            radius (double (opt opts :radius radius-m))
            angles (short-array azimuths)
-           distances (float-array azimuths)]
+           distances (float-array azimuths)
+           out (double-array 2)]
        (dotimes [az azimuths]
-         (let [[ang dist] (walk-angle grid lat lon az eye lat-m lon-m min-m max-m radius growth)]
-           (aset angles az (short (centi ang)))
-           (aset distances az (float dist))))
+         (walk-angle grid lat lon az eye lat-m lon-m min-m max-m radius growth out)
+         (aset angles az (short (centi (aget out 0))))
+         (aset distances az (float (aget out 1))))
        {:horizon/angles angles
         :horizon/distances distances}))))
 

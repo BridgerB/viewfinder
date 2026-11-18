@@ -1,0 +1,29 @@
+;; Photographs whose camera position is known, for timing the search and checking it still
+;; finds them. Paths are relative to the repository root. Images and skylines under data/ are
+;; gitignored: the Wikimedia ones are listed with their sources in static/results/LICENSE.md.
+;; :skyline nil means the tracer runs on the photograph. :fov nil means the lens is unknown.
+;; :baseline-km is the error of the search at the commit that added this file.
+[{:id :timpanogos
+  :image "static/mount-timpanogos.jpg" :skyline nil :fov nil
+  :truth [40.311187 -111.658619] :baseline-km 0.15 :quick true}
+ {:id :sandy
+  :image "static/sandy.jpg" :skyline nil :fov nil
+  :truth [40.569606 -111.812453] :baseline-km 0.22 :quick true}
+ {:id :little-cottonwood
+  :image "data/bench/photos/86.jpg" :skyline "data/bench/skylines/s86.json" :fov nil
+  :truth [40.57959 -111.79143] :baseline-km 0.12 :quick true}
+ {:id :library
+  :image "data/bench/photos/00.jpg" :skyline "data/bench/skylines/s00.json" :fov nil
+  :truth [40.76017 -111.8847] :baseline-km 1.62}
+ {:id :capitol-hazy
+  :image "data/bench/photos/04.jpg" :skyline "data/bench/skylines/s04.json" :fov nil
+  :truth [40.77713 -111.88786] :baseline-km 0.43}
+ {:id :capitol-cloudy
+  :image "data/bench/photos/05.jpg" :skyline "data/bench/skylines/s05.json" :fov nil
+  :truth [40.77674 -111.88854] :baseline-km 2.56}
+ {:id :red-butte
+  :image "data/bench/photos/117.jpg" :skyline "data/bench/skylines/s117.json" :fov nil
+  :truth [40.76288 -111.82008] :baseline-km 0.70}
+ {:id :daybreak
+  :image "data/bench/photos/21.jpg" :skyline "data/bench/skylines/s21.json" :fov 26.7
+  :truth [40.55505 -112.00346] :baseline-km 1.53}]

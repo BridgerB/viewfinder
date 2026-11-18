@@ -41,7 +41,19 @@ clojure -M:run build-rough GRID OUT 500 3000 300          # 500 m field where re
 clojure -M:run ridges  GRID CAMERAS.txt OUT.json          # per-degree ridge points for "id lat lon yaw fov" lines
 ```
 
-`search` takes several fields comma-separated. Use both: `data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn`. Near mountains the good fit is only ~125 m wide, so the 2 km field alone misses it (Little Cottonwood Canyon landed 51 km off). Refinement is 250 m around the best 60, then 100 m around the best 15. A full search is ~9 minutes.
+`search` takes several fields comma-separated. Use both: `data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn`. Near mountains the good fit is only ~125 m wide, so the 2 km field alone misses it (Little Cottonwood Canyon landed 51 km off). Refinement is 250 m around the best 60, then 100 m around the best 15.
+
+Each pass ranks places in two stages (`score/rank`): a cheap screen (`slide-surface`), then the full search on the survivors. The screen scores every yaw of each lens × tilt template against a place's horizon by sliding sums, with a capped line fit for roll. The full search (`surface`: 3D projection, trimmed error) runs only on the best `max(200, 3%)` places, within ±8° of the screen's yaw. A search takes ~5 s warm, ~12 s cold; it was ~9 min before the screen. `-Dviewfinder.rank=full` turns the screen off; `-Dviewfinder.screen=sparse` uses the older sparse-measure screen.
+
+Performance work is logged in `sight/PERF.md`. Before changing scoring, run `bench` (all known-location photos; `--quick` for three) and the tests (`golden_test` must still match unless a change is meant to alter results):
+
+```sh
+clojure -M -m viewfinder.main bench data/elevation/envi/n41w112 data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn sight/bench/cases.edn [--quick]
+clojure -M -m viewfinder.main profile GRID FIELDS IMAGE SKYLINE|- N REPS none|cpu|alloc   # cpu/alloc need -M:profile from sight/
+clojure -M:test   # from sight/; golden_test needs the repo root as working dir and skips otherwise
+```
+
+`-J-Dviewfinder.count=true` turns on inner-loop counters (`viewfinder.trace`). They are compiled out otherwise.
 
 `GRID` is the ENVI path _without_ `.hdr` (the header is read from `GRID.hdr`).
 

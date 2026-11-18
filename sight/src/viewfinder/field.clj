@@ -156,3 +156,34 @@
      :field/grounds grounds
      :field/angles angles
      :field/distances distances}))
+
+(defn subset
+  "The places of field at indices, as a field of their own."
+  [field indices]
+  (let [indices (vec indices)
+        n (count indices)
+        azimuths (int (:field/azimuths field))
+        ^doubles lats (:field/lats field)
+        ^doubles lons (:field/lons field)
+        ^floats grounds (:field/grounds field)
+        ^shorts angles (:field/angles field)
+        ^floats distances (:field/distances field)
+        out-lats (double-array n)
+        out-lons (double-array n)
+        out-grounds (float-array n)
+        out-angles (short-array (* n azimuths))
+        out-distances (float-array (* n azimuths))]
+    (dotimes [k n]
+      (let [i (int (nth indices k))]
+        (aset out-lats k (aget lats i))
+        (aset out-lons k (aget lons i))
+        (aset out-grounds k (aget grounds i))
+        (System/arraycopy angles (* i azimuths) out-angles (* k azimuths) azimuths)
+        (System/arraycopy distances (* i azimuths) out-distances (* k azimuths) azimuths)))
+    {:field/count n
+     :field/azimuths azimuths
+     :field/lats out-lats
+     :field/lons out-lons
+     :field/grounds out-grounds
+     :field/angles out-angles
+     :field/distances out-distances}))
