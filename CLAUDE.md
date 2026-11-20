@@ -7,14 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Viewfinder works out where a photograph of a mountain skyline was taken by comparing the skyline in the photo against terrain horizons computed from USGS elevation data. It is two programs that only meet through JSON files:
 
 - `sight/` — a Rust workspace (the `sight` CLI) that does all the heavy computation: horizon ray-walks over the DEM, skyline tracing, scoring every candidate place.
-- `src/` — a SvelteKit 3 site (Svelte 5, `@sveltejs/adapter-cloudflare`, deployed as a Cloudflare Worker) that only _displays_ pregenerated results bundled from `src/lib/assets/*.json`. The viewfinder pages have no server routes and no runtime computation.
+- `src/` — a SvelteKit 3 site (Svelte 5, `@sveltejs/adapter-cloudflare`, deployed as a Cloudflare Worker) that lets anyone upload a photo, see where it was taken, and share the result. It forwards searches to `sight serve` and only draws the answer; it does no terrain or camera maths itself.
 
 `brain/` is the project's knowledge base: why every number and decision is what it is, with each claim cited to source text. Read `brain/_index.md` before changing the locator; run `node brain/check.ts` after (see `brain/operating-manual.md`).
 
 ## Site commands
 
 ```sh
-pnpm dev            # vite dev (default port 5173)
+pnpm dev            # vite dev on port 4372
 pnpm build          # wrangler types --check, then vite build -> .svelte-kit/cloudflare
 pnpm preview        # wrangler dev on the built worker, port 4173
 pnpm check          # wrangler types --check + svelte-kit sync + svelte-check
@@ -28,11 +28,11 @@ Lefthook runs on every commit (`lefthook.yml`): Biome on staged files, `cargo fm
 
 Biome (`biome.json`) is the default config plus two things: it skips `worker-configuration.d.ts`, Markdown (its Markdown formatter does not understand YAML frontmatter and mangles the brain notes) and the generated `src/lib/assets/*.json`; and in `.svelte` files it turns off the unused-import/variable rules, because Biome only reads the `<script>` block and cannot see template usage.
 
-Imports use the package `imports` alias `#lib/...` (not `$lib`), with the `.ts` extension for TypeScript modules: `import * as photoMatch from "#lib/photo-match.ts"`.
+Imports use the package `imports` alias `#lib/...` (not `$lib`), with the `.ts` extension for TypeScript modules: `import { verdict } from "#lib/locate.ts"`.
 
 The base also carries the `sv` add-on demos: Better Auth on D1 via Drizzle (`src/lib/server`, `drizzle.config.ts`, `.env.example`) under `/demo`.
 
-The Worker bundle includes the imported JSON: `timpanogos.json` (4.2 MB) is the bulk of an ~885 KiB gzipped upload (`pnpm exec wrangler deploy --dry-run` prints the size; the free-plan limit is 3 MiB).
+The Worker bundle includes the imported JSON, `results.json` and `sandy-example.json` (`pnpm exec wrangler deploy --dry-run` prints the size; the free-plan limit is 3 MiB).
 
 ## Deployment
 
@@ -55,7 +55,7 @@ sight/target/release/sight search  GRID FIELDS IMAGE SURFACE.json MATCH.json [--
 sight/target/release/sight around  GRID IMAGE LAT LON [--skyline] [--fov] [--step 125] [--reach 1000]   # diagnostic
 sight/target/release/sight ridges  GRID CAMERAS.txt OUT.json   # ridge points for "id lat lon yaw fov" lines
 sight/target/release/sight trace   IMAGE
-sight/target/release/sight serve   GRID FIELDS [--host 0.0.0.0] [--port 4373]   # HTTP API for /locate (pnpm sight)
+sight/target/release/sight serve   GRID FIELDS [--host 0.0.0.0] [--port 4373]   # HTTP API for the upload page (pnpm sight)
 sight/target/release/sight trace-box IMAGE X0 Y0 X1 Y1 [--overlay OUT.jpg]   # the box tracer, drawn on the photo
 ```
 
@@ -86,38 +86,35 @@ Toolchain: Node 22+, pnpm 11, Rust (cargo, clippy, rustfmt) and Xcode's macOS SD
 - `data/elevation/field/n41w112.hzn`, `n41w112-rough500.hzn` — the two horizon fields.
 - `data/bench/` — bench photos, guided skylines and run history.
 
-`scripts/generate-timpanogos.ts` (the older TypeScript generator, using `@bridgerb/horizon` + `gdal-async`, which are not installed) points at `data/n41w112_30m.tif`, which no longer matches the layout above.
-
 ## Locator design
 
 The search compares the photo's skyline against stored horizons; nothing in it names a town or a summit, and fixes belong in the general loss. A pixel is a 3D direction: roll about the optical axis, then pitch, then yaw. Pitch is part of the projection, because in a wide frame a tilted camera's rows are not lines of equal elevation; treating elevation as `pitch + atan(y/f)` is wrong by several degrees at the edges of an ultrawide frame. The trimmed RMSE is scaled by `ref_fov / fov` (pixels, not degrees): a trace is off by pixels, and counting in degrees rewarded the narrowest lens, which sent Sandy and Timpanogos kilometres away whenever narrow lenses were allowed. The loss is in degrees: trimmed RMSE + log relief gap + 2×(1 − correlation), plus penalties for first-step berms and ground that falls away ahead of the camera. The brain has a note per term.
 
 ## Site
 
+The look is the "editorial" direction chosen from ten design studies: white paper, Newsreader headlines, DM Sans text, JetBrains Mono for links and codes, one terracotta accent (`--accent`). Every token is in `src/app.css`; the trace (yellow), horizon (cyan) and box (pink) colours appear only on photos and their legends. The header (`+layout.svelte`) links Examples, How it works and New photo.
+
 Routes:
 
-- `/timpanogos` — animated 360° orbit of horizons seen from an 8.9 km ring around the peak (`timpanogos.json`, 360 viewpoints, from `scripts/generate-timpanogos.ts`).
-- `/timpanogos/match` — photo with traced skyline and the model horizon overlaid, per-ring-angle shape match, elevation-angle profile, and the search heatmap.
-- `/sandy/match` — a second photo: traced skyline + search heatmap only.
-- `/results` — every bench photo on a map, one at a time: true spot, guess, and the view wedge out to the ridge the skyline sits on.
-- `/locate` — upload any photo (JPEG, PNG, or HEIC via macOS `sips`), see the traced skyline, redraw it by clicking along the ridge if it is wrong, and search. The page calls `sight serve` on port 4373 of the same host (`pnpm sight`; build it once with `pnpm sight:build`), which keeps the grid and fields in memory and holds the last 8 uploads. It only works locally: the search needs ~300 MB resident and a Cloudflare Worker has 128 MB, so a hosted version needs the same server in a container. The result shows a verdict that also checks whether the top 5 candidates agree, because a smooth skyline can fit many places with a low loss.
+- `/` — the app. Upload a photo (JPEG, PNG, or HEIC: `sips` locally, `heif-convert` in the container), watch a working screen (steps, clock, progress bar), get the result. The page calls the locator through `/api/sight/*`; `sight serve` keeps the grid and fields in memory and holds the last 8 uploads. "New photo" in the header starts over (`afterNavigate`).
   - Upload traces the whole photo and searches at once; nothing is confirmed unless the verdict is weak. The verdict (`verdict` in `#lib/locate.ts`) is good only if the loss is low, the top 5 candidates agree within 3 km, and the skyline has shape (`shapeOf` ≥ 0.4% of the photo height: a trace that slid along a smooth line fits many places with a deceptively low loss).
-  - A pink box always sits around the ridge the search read (`fitBox`), with handles; dragging an edge or corner calls `POST /retrace` with the box and searches again. The box tracer (`sky::trace_region`) takes, per column, the topmost step down in brightness + blueness of at least `MIN_STEP`; unlike the whole-photo tracer it does not need clearly blue sky, so it handles hazy or evening photos. The drag surface is square and 14 px larger than the photo so handles on the photo's border can be grabbed.
-- `/p/{uuid}` — a shared result, unlisted (`noindex`) but open to anyone with the link. Every search on /locate saves one through `POST /api/shares`: the upright photo goes to R2 (`PHOTOS`, `photos/{id}.jpg`) and the result to the D1 table `share`; the address bar switches to the link.
+  - A pink box always sits around the ridge the search read (`fitBox`), with corner handles; dragging an edge or corner calls `POST /retrace` with the box and searches again. The box tracer (`sky::trace_region`) takes, per column, the topmost step down in brightness + blueness of at least `MIN_STEP`; unlike the whole-photo tracer it does not need clearly blue sky, so it handles hazy or evening photos. The drag surface is 14 px larger than the photo so handles on the photo's border can be grabbed.
+  - Errors with nothing else to show (unreadable file, server down, expired upload) get a whole screen; a search that fails on a traced photo shows the photo and box to fix.
+- `/p/{uuid}` — a shared result, read-only, unlisted (`noindex`) but open to anyone with the link, with Open Graph tags for link previews. Every search on `/` saves one through `POST /api/shares`: the upright photo goes to R2 (`PHOTOS`, `photos/{id}.jpg`) and the result to the D1 table `share`; the address bar switches to the link. A missing id renders `+error.svelte` as "This link is gone."
+- `/examples` — every bench photo on a map, one at a time: true spot, Viewfinder's answer, and the view wedge out to the ridge the skyline sits on.
+- `/how` — trace, compare, pin, adjust, drawn from a real search of `static/sandy.jpg`.
+- `/locate` and `/results` redirect (308) to `/` and `/examples`.
 
-`src/lib/photo-match.ts` holds all the pure logic for the match pages (camera projection/unprojection that mirrors the locator's `ray`, SVG point strings, heat weighting). `src/lib/MatchMap.svelte` and `src/lib/ResultsMap.svelte` are Leaflet maps; Leaflet is imported dynamically inside an action because it needs `window`, and `leaflet.heat` needs `L` on `globalThis` first (`src/lib/leaflet-heat.d.ts` declares it, since it ships no types).
+`ResultView.svelte` is the result layout shared by `/` and `/p` (verdict, place name, photo, coordinates, map, camera facts, top 5, share). `PhotoFrame.svelte` draws the photo with its overlays in the photo's own pixel coordinates; the cyan horizon is the locator's `outline`, already in pixels. `places.ts` names the place from a built-in list of towns, so no geocoding service sees anyone's coordinates. `LocateMap`, `ResultsMap` and `CoverageMap` are Leaflet maps on OpenStreetMap tiles (desaturated by the `.muted-tiles` class); `basemap.ts` loads Leaflet on demand, because it needs `window`, and `leaflet.heat` needs `L` on `globalThis` first (`src/lib/leaflet-heat.d.ts` declares it, since it ships no types).
 
 Where each asset comes from:
 
 | Asset | Source |
 | --- | --- |
-| `timpanogos.json` | `scripts/generate-timpanogos.ts` |
-| `timpanogos-search.json`, `sandy-search.json` | `sight search` surface output (`[{lat, lon, loss}]`) |
-| `sandy-match.json` | `sight search` match output |
 | `results.json` | assembled from bench runs and `sight ridges` |
-| `timpanogos-match.json`, `sandy-skyline.json` | No generator is checked in. Their shapes are defined by `RawMatch` in `photo-match.ts` and the sandy page. |
+| `sandy-example.json` | one `POST /trace` + `POST /locate` of `static/sandy.jpg` on `sight serve` with `fov` 100, coordinates rounded |
 
-Photos live in `static/` and are referenced by absolute URL; the JSON is imported through Vite so it is content-hashed. `static/results/LICENSE.md` records the licence of every Wikimedia photo; the repository is public, so only add photos that may be redistributed and that show no one who has not agreed to it.
+Photos live in `static/` and are referenced by absolute URL; the JSON is imported through Vite so it is content-hashed. `static/mount-timpanogos.jpg` and `static/sandy.jpg` are bench photos (`sight/bench/cases.toml`), and `sandy.jpg` is also the "Try a sample" photo. `static/results/LICENSE.md` records the licence of every Wikimedia photo; the repository is public, so only add photos that may be redistributed and that show no one who has not agreed to it.
 
 ## Svelte MCP
 

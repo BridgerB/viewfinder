@@ -1,0 +1,139 @@
+/* Viewfinder's editorial look: white paper, dark ink, one terracotta accent. The overlay colours
+   (trace, horizon, box) are the product's own and appear only on photos and their legends. */
+:root {
+	--paper: #fff;
+	--soft: #faf6f1;
+	--ink: #222;
+	--ink-2: #444;
+	--muted: #666;
+	--faint: #888;
+	--rule: #e8e2db;
+	--rule-2: #e0d8ce;
+	--dash: #c8c0b6;
+	--accent: #c8553d;
+	--accent-dark: #8f3a28;
+	--good: #2f7d4a;
+	--unsure: #9a6200;
+	--poor: #b3261e;
+	--trace: #f2b53a;
+	--horizon: #1fb5c4;
+	--box: #e2458f;
+	--serif: "Newsreader", Georgia, "Times New Roman", serif;
+	--sans: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+	--mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+	color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--paper);
+	color: var(--ink);
+	font: 400 16px / 1.6 var(--sans);
+}
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+	border-bottom: 1px solid var(--accent);
+}
+
+a:hover {
+	color: var(--accent-dark);
+}
+
+button {
+	font: inherit;
+	cursor: pointer;
+}
+
+button:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible,
+label:focus-within {
+	outline: 3px solid var(--accent);
+	outline-offset: 3px;
+}
+
+h1,
+h2,
+h3 {
+	text-wrap: balance;
+}
+
+/* Shared pieces */
+.eyebrow {
+	font: 500 12px / 1.2 var(--sans);
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--accent);
+}
+
+.pill {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	border: 0;
+	border-radius: 99px;
+	padding: 11px 22px;
+	background: var(--accent);
+	color: #fff;
+	font-weight: 700;
+	text-decoration: none;
+}
+
+a.pill {
+	border-bottom: 0;
+}
+
+a.pill:hover,
+.pill:hover:not(:disabled) {
+	background: var(--accent-dark);
+	color: #fff;
+}
+
+.pill.dark {
+	background: var(--ink);
+}
+
+.pill.dark:hover:not(:disabled) {
+	background: #000;
+}
+
+.pill.big {
+	padding: 13px 26px;
+}
+
+.textlink {
+	background: none;
+	border: 0;
+	border-bottom: 1px solid var(--accent);
+	padding: 2px 0;
+	color: var(--accent);
+	font-weight: 500;
+}
+
+.textlink:hover {
+	color: var(--accent-dark);
+}
+
+.rounded {
+	border-radius: 14px;
+	overflow: hidden;
+}
+
+/* Map tiles, quieted to sit under the terracotta pin, wedge and heat. */
+.muted-tiles {
+	filter: saturate(0.3) brightness(1.04) contrast(0.92);
+}

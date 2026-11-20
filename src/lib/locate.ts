@@ -106,26 +106,26 @@ const verdict = (best: Place, spread: number, shape = 1): Verdict => {
 	if (shape < MIN_SHAPE)
 		return {
 			level: "unsure",
-			text: "Unsure: the traced skyline is almost a straight line, so it fits many places. Check that the orange line follows the ridge.",
+			text: "The traced skyline is almost a straight line, so it fits many places. Check that the yellow line follows the ridge.",
 		};
 	if (best.loss > 0.6)
 		return {
 			level: "poor",
-			text: "Poor fit: the skyline matches nowhere well. Check that the traced line follows the ridge.",
+			text: "The skyline matches nowhere well. Usually the yellow line caught trees, roofs or clouds instead of the ridge.",
 		};
 	if (spread > 3)
 		return {
 			level: "unsure",
-			text: `Unsure: the best candidates are up to ${spread.toFixed(1)} km apart, so this skyline fits several places.`,
+			text: `The best spots are up to ${spread.toFixed(1)} km apart, so this skyline fits several places.`,
 		};
 	if (best.loss > 0.3)
 		return {
 			level: "unsure",
-			text: "Unsure: the candidates agree, but the fit is loose. Check that the orange line follows the ridge.",
+			text: "The best spots agree, but the fit is loose. Check that the yellow line follows the ridge.",
 		};
 	return {
 		level: "good",
-		text: `Good fit, and the best candidates agree within ${spread.toFixed(1)} km.`,
+		text: `Good fit, and the best spots agree within ${spread.toFixed(1)} km.`,
 	};
 };
 
@@ -217,6 +217,21 @@ const grabCursor = (grab: Grab | null) =>
 const isShareId = (id: string) =>
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id);
 
+/**
+ * Heat for the map: every searched place weighted by how close its loss is to the best one.
+ * Places much worse than the best are left out, so the heat shows only the plausible area.
+ */
+const searchHeat = (hits: Located["surface"]) => {
+	if (hits.length === 0) return [];
+	const best = Math.min(...hits.map((h) => h.loss));
+	return hits.flatMap((hit) => {
+		const weight = Math.exp(-(hit.loss - best) / 0.06);
+		return weight < 0.15
+			? []
+			: [[hit.lat, hit.lon, weight] as [number, number, number]];
+	});
+};
+
 /** SVG `points` for a polyline. */
 const svgPoints = (points: readonly Point[]) =>
 	points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
@@ -232,6 +247,7 @@ export {
 	kmBetween,
 	MIN_SHAPE,
 	parseFov,
+	searchHeat,
 	shapeOf,
 	spreadKm,
 	svgPoints,

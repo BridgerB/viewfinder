@@ -3,77 +3,80 @@ import type { LayerGroup, Map as LeafletMap } from "leaflet";
 import type { Action } from "svelte/action";
 import { fromAction } from "svelte/attachments";
 import "leaflet/dist/leaflet.css";
-import type { Located } from "#lib/locate.ts";
-import { searchHeat } from "#lib/photo-match.ts";
+import { addBasemap, leaflet, loadLeaflet, MAP_INK } from "#lib/basemap.ts";
+import { type Located, searchHeat } from "#lib/locate.ts";
 
-let { result }: { result: Located } = $props();
+let {
+	result,
+	heat = "#c8553d",
+	ratio = "2 / 1",
+}: {
+	result: Located;
+	/** The heat's colour: the verdict's colour, so a weak answer looks weak on the map too. */
+	heat?: string;
+	ratio?: string;
+} = $props();
 
-type Leaflet = typeof import("leaflet");
 type HeatLayer = (
 	points: Array<[number, number, number]>,
 	options: Record<string, unknown>,
 ) => { addTo: (layer: LayerGroup) => unknown };
 
-const locateMap: Action<HTMLDivElement, Located> = (host, first) => {
+const locateMap: Action<HTMLDivElement, { result: Located; heat: string }> = (
+	host,
+	first,
+) => {
 	let map: LeafletMap | undefined;
 	let layer: LayerGroup | undefined;
-	let L: Leaflet | undefined;
 	let current = first;
 	let cancelled = false;
 
-	const draw = (r: Located) => {
-		current = r;
+	const draw = ({ result: r, heat: color }: typeof first) => {
+		current = { result: r, heat: color };
+		const L = leaflet();
 		if (!map || !layer || !L) return;
 		layer.clearLayers();
 		const guess: [number, number] = [r.best.lat, r.best.lon];
-		const heat = searchHeat(r.surface);
-		(L as Leaflet & { heatLayer: HeatLayer })
-			.heatLayer(
-				heat.samples.map((s) => [s.latitude, s.longitude, s.weight]),
-				{
-					radius: 22,
-					blur: 16,
-					minOpacity: 0.35,
-					max: 1,
-					gradient: {
-						0.2: "#1d4e89",
-						0.5: "#3ee0e0",
-						0.75: "#ffb020",
-						1: "#fff6d8",
-					},
-				},
-			)
+		(L as typeof L & { heatLayer: HeatLayer })
+			.heatLayer(searchHeat(r.surface), {
+				radius: 26,
+				blur: 22,
+				minOpacity: 0.25,
+				max: 1,
+				gradient: { 0.3: `${color}33`, 0.7: `${color}99`, 1: color },
+			})
 			.addTo(layer);
 		const ridge = r.ridge.map(([lat, lon]) => [lat, lon] as [number, number]);
 		if (ridge.length > 1) {
 			L.polygon([guess, ...ridge, guess], {
-				stroke: false,
-				fillColor: "#4facfe",
+				color: MAP_INK.accent,
+				weight: 1.2,
+				fillColor: MAP_INK.accent,
 				fillOpacity: 0.18,
 			}).addTo(layer);
-			L.polyline(ridge, { color: "#4facfe", weight: 3 })
-				.bindTooltip("The ridge the skyline sits on")
+			L.polyline(ridge, { color: MAP_INK.ink, weight: 2.5 })
+				.bindTooltip("The ridge in your photo")
 				.addTo(layer);
 		}
 		for (const [i, p] of r.top.slice(1, 5).entries()) {
 			L.circleMarker([p.lat, p.lon], {
-				radius: 5,
-				color: "#111111",
-				weight: 1,
-				fillColor: "#ffb020",
-				fillOpacity: 0.9,
+				radius: 4,
+				color: MAP_INK.ink,
+				weight: 1.5,
+				fillColor: "#fff",
+				fillOpacity: 1,
 			})
-				.bindTooltip(`Candidate ${i + 2}, loss ${p.loss.toFixed(2)}`)
+				.bindTooltip(`Spot ${i + 2}`)
 				.addTo(layer);
 		}
 		L.circleMarker(guess, {
-			radius: 8,
-			color: "#111111",
-			weight: 2,
-			fillColor: "#3ecf6e",
+			radius: 7,
+			color: "#fff",
+			weight: 2.5,
+			fillColor: MAP_INK.accent,
 			fillOpacity: 1,
 		})
-			.bindTooltip(`Best guess, loss ${r.best.loss.toFixed(2)}`)
+			.bindTooltip("Where the photo was taken")
 			.addTo(layer);
 		const points = [
 			guess,
@@ -84,17 +87,10 @@ const locateMap: Action<HTMLDivElement, Located> = (host, first) => {
 		map.fitBounds(L.latLngBounds(points), { padding: [30, 30], maxZoom: 14 });
 	};
 
-	const ready = import("leaflet").then(async (leaflet) => {
-		L = leaflet.default;
-		(globalThis as typeof globalThis & { L: Leaflet }).L = L;
-		await import("leaflet.heat");
+	const ready = loadLeaflet({ heat: true }).then((L) => {
 		if (cancelled || !host.isConnected) return;
-		map = L.map(host);
-		L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-			maxZoom: 19,
-			attribution:
-				'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-		}).addTo(map);
+		map = L.map(host, { scrollWheelZoom: false });
+		addBasemap(L, map);
 		layer = L.layerGroup().addTo(map);
 		draw(current);
 	});
@@ -114,26 +110,28 @@ const locateMap: Action<HTMLDivElement, Located> = (host, first) => {
 
 <div
 	class="map"
-	{@attach fromAction(locateMap, () => result)}
+	style:aspect-ratio={ratio}
+	{@attach fromAction(locateMap, () => ({ result, heat }))}
 	role="img"
-	aria-label="Map of the search: best guess, other candidates, heatmap of good fits, and the ridge the photo shows"
+	aria-label="Map: where the photo was taken, the direction it faces, the ridge it shows, and how well every spot matched"
 ></div>
 
 <style>
 	.map {
-		height: 520px;
-		border-radius: 8px;
+		width: 100%;
+		min-height: 280px;
+		border-radius: 14px;
 		overflow: hidden;
-		background: #111;
+		background: var(--soft);
 	}
 
 	.map :global(.leaflet-control-attribution) {
-		background: rgba(10, 10, 15, 0.72);
-		color: #888;
-		font-size: 10px;
+		background: rgba(255, 255, 255, 0.8);
+		color: var(--faint);
+		font: 10px var(--sans);
 	}
 
 	.map :global(.leaflet-control-attribution a) {
-		color: #4facfe;
+		border: 0;
 	}
 </style>
