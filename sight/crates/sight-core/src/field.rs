@@ -117,20 +117,27 @@ impl Field {
             angles: Vec::with_capacity(n * AZIMUTHS),
             distances: Vec::with_capacity(n * AZIMUTHS),
         };
-        for rec in bytes[HEADER_BYTES..HEADER_BYTES + n * RECORD_BYTES].chunks_exact(RECORD_BYTES) {
+        for rec in bytes[HEADER_BYTES..HEADER_BYTES + n * RECORD_BYTES]
+            .as_chunks::<RECORD_BYTES>()
+            .0
+        {
             out.lats.push(f64::from_le_bytes(array8(&rec[0..8])));
             out.lons.push(f64::from_le_bytes(array8(&rec[8..16])));
             out.grounds.push(f32::from_le_bytes(array4(&rec[16..20])));
             let angles = &rec[POSE_BYTES..POSE_BYTES + AZIMUTHS * 2];
             out.angles.extend(
                 angles
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|c| i16::from_le_bytes([c[0], c[1]])),
             );
             let dists = &rec[POSE_BYTES + AZIMUTHS * 2..];
             out.distances.extend(
                 dists
-                    .chunks_exact(4)
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
                     .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])),
             );
         }

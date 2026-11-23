@@ -57,6 +57,16 @@ enum Cmd {
         step: f64,
         radius: f64,
         relief: f64,
+        /// Only places inside SOUTH NORTH WEST EAST; the whole grid when left out.
+        #[arg(num_args = 4)]
+        bbox: Vec<f64>,
+    },
+    /// The same places as an existing field, walked again on GRID (for example a larger mosaic,
+    /// so rays that used to leave the tile now see the ground beyond it).
+    Rewalk {
+        grid: PathBuf,
+        field: PathBuf,
+        out: PathBuf,
     },
     /// Where a photograph was taken: writes the heatmap and the winning camera's horizon.
     Search {
@@ -108,6 +118,17 @@ enum Cmd {
         #[arg(long)]
         overlay: Option<PathBuf>,
     },
+    /// The skyline from the sky-segmentation network (MODEL is skyseg.onnx), optionally drawn
+    /// onto a copy of the photo, with the network's time.
+    SkyTrace {
+        image: PathBuf,
+        model: PathBuf,
+        #[arg(long)]
+        overlay: Option<PathBuf>,
+        /// A hand-traced skyline to draw beside the trace, for comparison.
+        #[arg(long)]
+        guide: Option<PathBuf>,
+    },
     /// Every known-location photograph searched, timed and checked against its truth.
     Bench {
         grid: PathBuf,
@@ -117,6 +138,12 @@ enum Cmd {
         quick: bool,
         #[arg(long, default_value = "data/bench/runs")]
         runs: PathBuf,
+        /// Trace with the sky-segmentation network (skyseg.onnx) instead of the colour rules.
+        #[arg(long)]
+        sky: Option<PathBuf>,
+        /// Ignore the hand-traced skylines and trace every photo, to test the tracer.
+        #[arg(long)]
+        no_guides: bool,
     },
     /// A fixed sample of PLACES scored REPS times: the workload for profilers.
     Profile {
@@ -153,12 +180,16 @@ enum Cmd {
         host: String,
         #[arg(long, default_value_t = 4373)]
         port: u16,
+        /// Trace with the sky-segmentation network (skyseg.onnx) instead of the colour rules.
+        #[arg(long)]
+        sky: Option<PathBuf>,
     },
 }
 
 fn main() -> Result<()> {
     match Cli::parse().cmd {
         Cmd::Info { grid } => info(&grid),
+        Cmd::Rewalk { grid, field, out } => rewalk(&grid, &field, &out),
         Cmd::Build {
             grid,
             out,
@@ -171,7 +202,8 @@ fn main() -> Result<()> {
             step,
             radius,
             relief,
-        } => build_rough(&grid, &out, step, radius, relief),
+            bbox,
+        } => build_rough(&grid, &out, step, radius, relief, &bbox),
         Cmd::Search {
             grid,
             fields,
@@ -220,13 +252,29 @@ fn main() -> Result<()> {
             y1,
             overlay,
         } => trace_box(&image, sky::Region { x0, y0, x1, y1 }, overlay.as_deref()),
+        Cmd::SkyTrace {
+            image,
+            model,
+            overlay,
+            guide,
+        } => sky_trace(&image, &model, overlay.as_deref(), guide.as_deref()),
         Cmd::Bench {
             grid,
             fields,
             cases,
             quick,
             runs,
-        } => bench(&grid, &fields, &cases, quick, &runs),
+            sky,
+            no_guides,
+        } => bench(
+            &grid,
+            &fields,
+            &cases,
+            quick,
+            &runs,
+            sky.as_deref(),
+            no_guides,
+        ),
         Cmd::Profile {
             grid,
             fields,
@@ -249,7 +297,8 @@ fn main() -> Result<()> {
             fields,
             host,
             port,
-        } => serve::serve(&grid, &fields, &host, port),
+            sky,
+        } => serve::serve(&grid, &fields, &host, port, sky.as_deref()),
     }
 }
 
@@ -266,10 +315,21 @@ fn photo(
     skyline: Option<&Path>,
     cfg: &Config,
 ) -> Result<(Photo, Vec<sight_core::camera::Pixel>)> {
+    photo_with(image, skyline, cfg, None)
+}
+
+/// As `photo`, tracing with the sky-segmentation network when one is given.
+fn photo_with(
+    image: &Path,
+    skyline: Option<&Path>,
+    cfg: &Config,
+    net: Option<&sight_io::skyseg::SkyModel>,
+) -> Result<(Photo, Vec<sight_core::camera::Pixel>)> {
     let img = sight_io::read_image(image)?;
-    let line = match skyline {
-        Some(p) => sight_io::read_skyline(p)?,
-        None => sky::trace_best(&img, &cfg.sky),
+    let line = match (skyline, net) {
+        (Some(p), _) => sight_io::read_skyline(p)?,
+        (None, Some(net)) => traced_with_sky(&img, &net.sky(&img)?, None, &cfg.sky),
+        (None, None) => sky::trace_best(&img, &cfg.sky),
     };
     let sampled = sky::decimate(&line, cfg.sky.columns);
     Ok((
@@ -280,6 +340,28 @@ fn photo(
         },
         line,
     ))
+}
+
+/// The skyline from a sky map, inside `region` or over the whole photo; the colour rules when
+/// the map finds almost nothing (a photo the network cannot read).
+pub(crate) fn traced_with_sky(
+    img: &sky::Image,
+    map: &sight_core::skymap::SkyMap,
+    region: Option<sky::Region>,
+    cfg: &sight_core::config::SkyConfig,
+) -> Vec<sight_core::camera::Pixel> {
+    let area = region.unwrap_or_else(|| sight_core::skymap::whole(img));
+    let line = sight_core::skymap::drop_structures(
+        &sight_core::skymap::trace_skymap(img, map, area),
+        img.height,
+    );
+    if line.len() >= 24 {
+        line
+    } else if let Some(r) = region {
+        sky::trace_region(img, r)
+    } else {
+        sky::trace_best(img, cfg)
+    }
 }
 
 fn info(grid: &Path) -> Result<()> {
@@ -322,11 +404,22 @@ fn build(grid: &Path, out: &Path, step: f64, bbox: &[f64]) -> Result<()> {
     Ok(())
 }
 
-fn build_rough(grid: &Path, out: &Path, step: f64, radius: f64, relief: f64) -> Result<()> {
+fn build_rough(
+    grid: &Path,
+    out: &Path,
+    step: f64,
+    radius: f64,
+    relief: f64,
+    bbox: &[f64],
+) -> Result<()> {
     let t0 = Instant::now();
     let loaded = LoadedDem::open(grid)?;
     let dem = loaded.dem();
-    let all = field::lattice(dem.south(), dem.geo.north, dem.geo.west, dem.east(), step);
+    let (s, n, w, e) = match bbox {
+        [s, n, w, e] => (*s, *n, *w, *e),
+        _ => (dem.south(), dem.geo.north, dem.geo.west, dem.east()),
+    };
+    let all = field::lattice(s, n, w, e, step);
     let rough: Vec<(f64, f64)> = all
         .iter()
         .copied()
@@ -338,6 +431,29 @@ fn build_rough(grid: &Path, out: &Path, step: f64, radius: f64, relief: f64) -> 
         "lattice {} rough {} wrote {} to {} in {:.2} s",
         all.len(),
         rough.len(),
+        f.len(),
+        out.display(),
+        t0.elapsed().as_secs_f64()
+    );
+    Ok(())
+}
+
+fn rewalk(grid: &Path, field: &Path, out: &Path) -> Result<()> {
+    let t0 = Instant::now();
+    let loaded = LoadedDem::open(grid)?;
+    let dem = loaded.dem();
+    let old = sight_io::read_field(field)?;
+    let places: Vec<(f64, f64)> = old
+        .lats
+        .iter()
+        .copied()
+        .zip(old.lons.iter().copied())
+        .collect();
+    let f = field::gather(&dem, &Config::default().horizon, &places);
+    sight_io::write_field(out, &f)?;
+    println!(
+        "places {} wrote {} to {} in {:.2} s",
+        places.len(),
         f.len(),
         out.display(),
         t0.elapsed().as_secs_f64()
@@ -495,6 +611,51 @@ fn trace(image: &Path) -> Result<()> {
     Ok(())
 }
 
+fn sky_trace(
+    image: &Path,
+    model: &Path,
+    overlay: Option<&Path>,
+    guide: Option<&Path>,
+) -> Result<()> {
+    let t0 = Instant::now();
+    let net = sight_io::skyseg::SkyModel::load(model)?;
+    let loaded = t0.elapsed().as_secs_f64();
+    let img = sight_io::read_image(image)?;
+    let t1 = Instant::now();
+    let map = net.sky(&img)?;
+    let ran = t1.elapsed().as_secs_f64();
+    let t2 = Instant::now();
+    let whole = sky::Region {
+        x0: 0,
+        y0: 0,
+        x1: img.width,
+        y1: img.height,
+    };
+    let line = sight_core::skymap::drop_structures(
+        &sight_core::skymap::trace_skymap(&img, &map, whole),
+        img.height,
+    );
+    println!(
+        "{}x{} points {} · load {loaded:.2} s, network {ran:.2} s, path {:.3} s",
+        img.width,
+        img.height,
+        line.len(),
+        t2.elapsed().as_secs_f64()
+    );
+    if let Some(out) = overlay {
+        let other: Vec<(f64, f64)> = match guide {
+            Some(g) => sight_io::read_skyline(g)?
+                .iter()
+                .map(|p| (p.x, p.y))
+                .collect(),
+            None => Vec::new(),
+        };
+        sight_io::write_overlay(image, out, &line, &other)?;
+        println!("wrote {}", out.display());
+    }
+    Ok(())
+}
+
 fn trace_box(image: &Path, region: sky::Region, overlay: Option<&Path>) -> Result<()> {
     let img = sight_io::read_image(image)?;
     let line = sky::trace_region(&img, region);
@@ -567,7 +728,16 @@ fn latest_run(dir: &Path) -> Option<BenchRun> {
     serde_json::from_str(&std::fs::read_to_string(files.last()?).ok()?).ok()
 }
 
-fn bench(grid: &Path, fields: &str, cases: &Path, quick: bool, runs: &Path) -> Result<()> {
+fn bench(
+    grid: &Path,
+    fields: &str,
+    cases: &Path,
+    quick: bool,
+    runs: &Path,
+    sky: Option<&Path>,
+    no_guides: bool,
+) -> Result<()> {
+    let net = sky.map(sight_io::skyseg::SkyModel::load).transpose()?;
     let before = latest_run(runs);
     let t0 = Instant::now();
     let loaded = LoadedDem::open(grid)?;
@@ -582,7 +752,12 @@ fn bench(grid: &Path, fields: &str, cases: &Path, quick: bool, runs: &Path) -> R
         let cfg = config(case.fov);
         let start = Instant::now();
         let mut clock = Clock::new();
-        let (photo, _) = photo(&case.image, case.skyline.as_deref(), &cfg)?;
+        let guide = if no_guides {
+            None
+        } else {
+            case.skyline.as_deref()
+        };
+        let (photo, _) = photo_with(&case.image, guide, &cfg, net.as_ref())?;
         clock.lap("photo");
         let found: Found = search::search(&dem, &fields, &photo, &cfg, &mut clock);
         let seconds = start.elapsed().as_secs_f64();

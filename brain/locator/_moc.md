@@ -9,7 +9,7 @@ verifiedAgainst: 3b6ccf9, 2026-11-18
 `sight/` is a Cargo workspace: `sight-core` (pure computation, `#![forbid(unsafe_code)]`, never reads a clock or a file), `sight-io` (memory-mapped DEM, HZN2 files, images, JSON, bench cases), `sight-cli` (the `sight` binary). The pipeline, in the order data flows:
 
 1. [[locator/data/_moc|Data]]: DEM grid → horizon walk → horizon field.
-2. [[locator/sky/skyline-trace|Sky]]: photo → skyline pixels.
+2. [[locator/sky/skyline-trace|Sky]]: photo → skyline pixels; with the network, [[locator/sky/sky-model]].
 3. [[locator/camera/_moc|Camera]]: skyline pixels → directions (offset, elevation) per lens, roll and pitch.
 4. [[locator/scoring/_moc|Scoring]]: the full trimmed-error search at one place.
 5. [[locator/screen/_moc|Screen]]: the cheap pass that decides which places get the full search.

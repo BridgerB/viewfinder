@@ -85,7 +85,7 @@ const frame = {
 </ol>
 
 <div class="footer">
-	<span>Accurate to a few hundred metres · Wasatch Front only · needs a skyline</span>
+	<span>Accurate to a few hundred metres · Salt Lake, Utah and Davis counties · needs a skyline</span>
 	<a class="pill big" href={resolve("/")}>Try a photo</a>
 </div>
 

@@ -502,9 +502,9 @@ const release = () => {
 	<section class="coverage">
 		<div class="cov-text">
 			<div class="eyebrow">Works in</div>
-			<div class="cov-title">Wasatch Front, Utah</div>
+			<div class="cov-title">Salt Lake, Utah and Davis counties</div>
 			<div class="cov-note">
-				40–41° N, 111–112° W<br />Provo to Salt Lake City.<br />Needs a visible skyline.
+				From Clearfield to Santaquin,<br />facing any direction.<br />Needs a visible skyline.
 			</div>
 			<a href={resolve("/examples")}>See example photos</a>
 		</div>

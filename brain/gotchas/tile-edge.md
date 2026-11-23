@@ -15,4 +15,4 @@ sourceRefs:
 
 Rays that leave the tile also see less: a camera near the north edge (41°N) misses ridges beyond it. The winning yaws in the latest bench run all lie between 22° and 169° (north-east through south), toward the Wasatch, which is inside the tile.
 
-**Fix:** mosaic neighbouring tiles into one grid (GDAL `gdalbuildvrt` then translate to ENVI int16 BSQ) and rebuild both fields. Not done; the conversion command for the current tile is not recorded either ([[locator/data/dem-grid]]).
+**Fix:** done for Salt Lake, Utah and Davis counties: nine tiles mosaicked into one grid and both fields rebuilt ([[locator/data/three-counties]]). Daybreak's truth is now inside the data (rank 17 → 8 without the hand-traced line). A camera outside those counties still has no place under it.

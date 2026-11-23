@@ -26,7 +26,7 @@
 		"auth:schema": "auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes",
 		"lint": "biome check",
 		"format": "biome format --write",
-		"sight": "sight/target/release/sight serve data/elevation/envi/n41w112 data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn --host 0.0.0.0",
+		"sight": "sight/target/release/sight serve data/elevation/envi/wasatch data/elevation/field/wasatch.hzn,data/elevation/field/wasatch-rough500.hzn --host 0.0.0.0 --sky data/models/skyseg.onnx",
 		"sight:build": "cargo build --release --manifest-path sight/Cargo.toml",
 		"deploy:sight": "wrangler deploy -c cloud/sight/wrangler.jsonc",
 		"deploy": "pnpm build && wrangler deploy"

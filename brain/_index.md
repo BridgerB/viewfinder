@@ -32,6 +32,6 @@ What this repository does, why each number in it is what it is, and what was tri
 ## Limits of this brain
 
 - Numbers about speed were measured on a 10-core Apple laptop under heavy load from other work (load average 48–84). Treat seconds as ±30%; the microbenchmarks in [[decisions/f32-screen-kernel]] are the clean comparison.
-- The truth set is 8 photos, all in Salt Lake and Utah counties, all on one USGS tile (`n41w112`). Nothing here has been tested on another tile, another range, or a photo whose skyline is not a mountain ridge.
+- The truth set is 8 photos, all in Salt Lake and Utah counties, all inside the original USGS tile (`n41w112`). The data now covers Salt Lake, Utah and Davis counties ([[locator/data/three-counties]]), but no photo with a known location tests the new parts. Nothing here has been tested on another tile, another range, or a photo whose skyline is not a mountain ridge.
 - The Clojure implementation still exists in `sight/src` as the reference until cut-over; notes describe the Rust code, which matches it bit for bit except where [[gotchas/jpeg-decoder-differences]] says otherwise.
 - `timpanogos-match.json` and `sandy-skyline.json` have no generator in the repo; [[site/data-flow]] says what is known.

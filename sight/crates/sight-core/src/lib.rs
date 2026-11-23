@@ -39,5 +39,6 @@ pub mod score;
 pub mod screen;
 pub mod search;
 pub mod sky;
+pub mod skymap;
 
 pub use config::Config;

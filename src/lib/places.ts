@@ -2,7 +2,7 @@
 
 import { kmBetween, type LatLon } from "#lib/locate.ts";
 
-/** Towns and resorts in and around the covered tile (40–41° N, 111–112° W), [name, lat, lon]. */
+/** Towns and resorts in and around Salt Lake, Utah and Davis counties, [name, lat, lon]. */
 const TOWNS: readonly (readonly [string, number, number])[] = [
 	["Salt Lake City", 40.7608, -111.891],
 	["South Salt Lake", 40.7188, -111.8883],
@@ -43,6 +43,23 @@ const TOWNS: readonly (readonly [string, number, number])[] = [
 	["Springville", 40.1652, -111.6107],
 	["Mapleton", 40.1302, -111.5785],
 	["Bountiful", 40.8894, -111.8808],
+	["North Salt Lake", 40.8486, -111.9069],
+	["Woods Cross", 40.8716, -111.8922],
+	["Centerville", 40.918, -111.8722],
+	["Farmington", 40.9805, -111.8874],
+	["Kaysville", 41.0352, -111.9386],
+	["Layton", 41.0602, -111.9711],
+	["Syracuse", 41.0894, -112.0647],
+	["Clearfield", 41.1108, -112.0261],
+	["Antelope Island", 40.9575, -112.2147],
+	["Magna", 40.7091, -112.1016],
+	["Copperton", 40.5644, -112.0938],
+	["Spanish Fork", 40.1149, -111.6549],
+	["Salem", 40.053, -111.6735],
+	["Payson", 40.0444, -111.7321],
+	["Santaquin", 39.9755, -111.7849],
+	["Lake Shore", 40.1197, -111.7499],
+	["Goshen", 39.9516, -111.9005],
 ];
 
 /** A name for where a point is: the town it is in, near, or just the region. */

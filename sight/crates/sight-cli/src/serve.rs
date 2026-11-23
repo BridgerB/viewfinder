@@ -22,7 +22,9 @@ use sight_core::horizon;
 use sight_core::score::Place;
 use sight_core::search::{self, NoTimer};
 use sight_core::sky;
+use sight_core::skymap::SkyMap;
 use sight_io::LoadedDem;
+use sight_io::skyseg::SkyModel;
 use tiny_http::{Header, Method, Request, Response, Server};
 
 /// Largest upload accepted, bytes. A phone photo is 2–8 MB.
@@ -45,6 +47,8 @@ struct Upload {
     /// The skyline a search uses: the whole-photo trace, or the trace inside the box last given
     /// to /retrace.
     current: Vec<Pixel>,
+    /// The network's sky map, kept so a box can be traced again without running it twice.
+    map: Option<SkyMap>,
 }
 
 #[derive(Deserialize)]
@@ -104,7 +108,11 @@ struct Located {
 }
 
 /// Serves the locator over HTTP on `host:port` until killed.
-pub fn serve(grid: &Path, fields: &str, host: &str, port: u16) -> Result<()> {
+pub fn serve(grid: &Path, fields: &str, host: &str, port: u16, sky: Option<&Path>) -> Result<()> {
+    let net = sky.map(SkyModel::load).transpose()?;
+    if let Some(path) = sky {
+        println!("sight serve: tracing with {}", path.display());
+    }
     let loaded = LoadedDem::open(grid)?;
     let dem = loaded.dem();
     let fields = sight_io::read_fields(fields)?;
@@ -116,6 +124,7 @@ pub fn serve(grid: &Path, fields: &str, host: &str, port: u16) -> Result<()> {
     let mut state = State {
         uploads: BTreeMap::new(),
         next: 1,
+        net,
     };
     for mut req in server.incoming_requests() {
         let reply = route(&mut req, &dem, &fields, &mut state).unwrap_or_else(|e| {
@@ -135,6 +144,8 @@ pub fn serve(grid: &Path, fields: &str, host: &str, port: u16) -> Result<()> {
 struct State {
     uploads: BTreeMap<u64, Upload>,
     next: u64,
+    /// The sky-segmentation network, when the server was started with --sky.
+    net: Option<SkyModel>,
 }
 
 fn route(
@@ -200,7 +211,16 @@ fn trace(bytes: &[u8], state: &mut State) -> Result<Reply> {
         }
     };
     let fov = decoded.fov.or_else(|| sight_io::exif_fov(bytes));
-    let traced = sky::trace_best(&decoded.image, &Config::default().sky);
+    let cfg = Config::default();
+    let map = state
+        .net
+        .as_ref()
+        .map(|net| net.sky(&decoded.image))
+        .transpose()?;
+    let traced = match &map {
+        Some(m) => crate::traced_with_sky(&decoded.image, m, None, &cfg.sky),
+        None => sky::trace_best(&decoded.image, &cfg.sky),
+    };
     let reply = Traced {
         id,
         width: decoded.image.width as u32,
@@ -216,6 +236,7 @@ fn trace(bytes: &[u8], state: &mut State) -> Result<Reply> {
             height: reply.height,
             current: traced.clone(),
             traced,
+            map,
         },
     );
     while state.uploads.len() > KEEP {
@@ -271,7 +292,12 @@ fn retrace(ask: &RetraceRequest, state: &mut State) -> Result<Reply> {
                 x1: corner(x0.max(x1)),
                 y1: corner(y0.max(y1)),
             };
-            let line = sky::trace_region(&decoded.image, region);
+            let line = match &upload.map {
+                Some(m) => {
+                    crate::traced_with_sky(&decoded.image, m, Some(region), &Config::default().sky)
+                }
+                None => sky::trace_region(&decoded.image, region),
+            };
             if line.len() < 24 {
                 bail!(
                     "no mountain ridge found inside that box; make it wider and include some sky above the ridge"

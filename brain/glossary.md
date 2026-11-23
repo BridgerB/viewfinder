@@ -9,7 +9,7 @@ verifiedAgainst: 3b6ccf9, 2026-11-18
 - **Azimuth**: compass direction in whole degrees, 0 north, clockwise. A horizon has one sample per azimuth.
 - **Centidegree**: 1/100°. Horizon angles are stored as `i16` centidegrees; `i16::MIN` means missing.
 - **Corr**: Pearson correlation between the photo skyline's elevations and the horizon's, over kept columns. Shape agreement independent of offset and scale.
-- **DEM**: digital elevation model. Here one USGS 1/3″ tile (`n41w112`, 10812 × 10812 cells, ~9.26e-5° ≈ 10 m spacing) as ENVI int16.
+- **DEM**: digital elevation model. Here nine USGS 1/3″ tiles cropped to three counties plus 50 km (`wasatch`, 29,598 × 24,549 cells, ~9.26e-5° ≈ 10 m spacing) as ENVI int16; see [[locator/data/three-counties]].
 - **Field**: horizons for a lattice of places, stored as an HZN2 file. See [[locator/data/horizon-field]].
 - **FOV**: horizontal field of view of the lens, degrees.
 - **gsigma / hsigma**: standard deviation (relief) of the photo skyline's elevations and of the horizon's, over kept columns, degrees.

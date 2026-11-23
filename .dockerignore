@@ -4,7 +4,8 @@
 !sight/
 sight/target/
 sight/.cpcache/
-!data/elevation/envi/n41w112
-!data/elevation/envi/n41w112.hdr
-!data/elevation/field/n41w112.hzn
-!data/elevation/field/n41w112-rough500.hzn
+!data/elevation/envi/wasatch
+!data/elevation/envi/wasatch.hdr
+!data/elevation/field/wasatch.hzn
+!data/elevation/field/wasatch-rough500.hzn
+!data/models/skyseg.onnx

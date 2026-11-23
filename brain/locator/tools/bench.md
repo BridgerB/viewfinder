@@ -3,7 +3,7 @@ type: area
 status: verified
 verifiedAgainst: 3b6ccf9, 2026-11-18
 sourceRefs:
-  - sight/crates/sight-cli/src/main.rs#fn bench(grid: &Path, fields: &str, cases: &Path, quick: bool, runs: &Path) -> Result<()> {
+  - sight/crates/sight-cli/src/main.rs#fn bench(
   - sight/crates/sight-cli/src/main.rs#fn first_within(truth: [f64; 2], points: impl Iterator<Item = [f64; 2]>) -> Option<usize> {
   - sight/bench/cases.toml#baseline_km is the search's error when this bench was set up.
 ---

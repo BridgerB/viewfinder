@@ -25,6 +25,9 @@ Little-endian. Header 12 bytes: magic `HZN2`, i32 count, i32 azimuths (360). The
 
 ## The two stored fields
 
+The fields in use are `wasatch.hzn` and `wasatch-rough500.hzn`, built the same way over three counties ([[three-counties]]). The originals, over the single tile:
+
+
 - `n41w112.hzn`: a 2 km lattice over the tile, 2352 places.
 - `n41w112-rough500.hzn`: a 500 m lattice kept only where `rugged` holds: the ground within 3 km spans ≥ 300 m of relief, sampled on 4 rings × 16 bearings. 29,669 places, ~10.7 s to build in Rust.
 

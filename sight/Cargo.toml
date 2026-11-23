@@ -25,6 +25,7 @@ proptest = "1"
 divan = "0.1"
 tiny_http = "0.12"
 kamadak-exif = "0.6"
+tract-onnx = "0.23"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

@@ -25,7 +25,9 @@ FROM --platform=linux/amd64 debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends libheif-examples \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/target/x86_64-unknown-linux-gnu/release/sight /usr/local/bin/sight
-COPY data/elevation/envi/n41w112 data/elevation/envi/n41w112.hdr /data/
-COPY data/elevation/field/n41w112.hzn data/elevation/field/n41w112-rough500.hzn /data/
+COPY data/elevation/envi/wasatch data/elevation/envi/wasatch.hdr /data/
+COPY data/elevation/field/wasatch.hzn data/elevation/field/wasatch-rough500.hzn /data/
+# The sky-segmentation network (U²-Net, MIT, from Hugging Face JianyuanWang/skyseg).
+COPY data/models/skyseg.onnx /data/
 EXPOSE 4373
-CMD ["sight", "serve", "/data/n41w112", "/data/n41w112.hzn,/data/n41w112-rough500.hzn", "--host", "0.0.0.0", "--port", "4373"]
+CMD ["sight", "serve", "/data/wasatch", "/data/wasatch.hzn,/data/wasatch-rough500.hzn", "--host", "0.0.0.0", "--port", "4373", "--sky", "/data/skyseg.onnx"]

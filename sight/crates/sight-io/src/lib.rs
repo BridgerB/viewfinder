@@ -53,7 +53,11 @@ pub enum IoError {
         want: usize,
         have: usize,
     },
+    #[error("{path}: {message}")]
+    Model { path: PathBuf, message: String },
 }
+
+pub mod skyseg;
 
 fn file_err(path: &Path) -> impl FnOnce(std::io::Error) -> IoError + '_ {
     move |source| IoError::File {
@@ -109,12 +113,16 @@ impl LoadedDem {
                 Samples::Mapped(map)
             }
             ByteOrder::Little => Samples::Owned(
-                map.chunks_exact(2)
+                map.as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|c| i16::from_le_bytes([c[0], c[1]]))
                     .collect(),
             ),
             ByteOrder::Big => Samples::Owned(
-                map.chunks_exact(2)
+                map.as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|c| i16::from_be_bytes([c[0], c[1]]))
                     .collect(),
             ),

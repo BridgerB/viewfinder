@@ -205,7 +205,7 @@ mod tests {
                         pitch,
                     };
                     let px = outline(&angles, pose, w, h);
-                    assert!(!px.is_empty());
+                    assert_ne!(px, [] as [(f64, f64); 0]);
                     for (x, y) in px {
                         let (off, elev) = ray(w, h, focal(w, fov), roll, pitch, x, y);
                         let az = 120.0 + off;

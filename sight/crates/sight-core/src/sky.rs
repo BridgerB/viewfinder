@@ -168,7 +168,7 @@ const BLUE_WEIGHT: f64 = 1.0;
 /// highest; land, hazy blue-grey rock and green or yellow trees score lower, so the ridge is a
 /// step down in this value. A slow fade of the sky towards the horizon is not a step.
 #[inline]
-fn skyness(p: u32) -> f64 {
+pub(crate) fn skyness(p: u32) -> f64 {
     let (r, g, b) = channels(p);
     let (r, g, b) = (r as f64, g as f64, b as f64);
     0.299 * r + 0.587 * g + 0.114 * b + BLUE_WEIGHT * (b - r)
@@ -177,7 +177,7 @@ fn skyness(p: u32) -> f64 {
 /// Smallest step down in `skyness` that counts as a ridge: above the sky's own fade and most
 /// cloud edges, below the step from sky to hazy rock. Tuned on a hazy evening photo over the
 /// Wasatch, where a relative bar passed over sunlit slopes for the trees beneath them.
-const MIN_STEP: f64 = 30.0;
+pub(crate) const MIN_STEP: f64 = 30.0;
 
 /// Smallest drop in blueness (blue minus red) from above a ridge to below it. Tuned on a photo
 /// where a dark grey cloud sat on a saddle: bright cloud to dark cloud loses brightness but not

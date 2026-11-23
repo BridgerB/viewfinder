@@ -1,15 +1,15 @@
 <script lang="ts">
 import type { Attachment } from "svelte/attachments";
 import "leaflet/dist/leaflet.css";
+import outlines from "#lib/assets/counties.json";
 import { addBasemap, loadLeaflet, MAP_INK } from "#lib/basemap.ts";
 
 let { ratio = "16 / 9" }: { ratio?: string } = $props();
 
-/** The one terrain tile the locator has: 40–41° N, 111–112° W. */
-const TILE: [[number, number], [number, number]] = [
-	[40, -112],
-	[41, -111],
-];
+/** A GeoJSON FeatureCollection; JSON imports type `type` as a plain string, so it is cast once. */
+const counties = outlines as unknown as Parameters<
+	typeof import("leaflet").geoJSON
+>[0];
 
 const coverage: Attachment<HTMLDivElement> = (host) => {
 	let cancelled = false;
@@ -22,15 +22,18 @@ const coverage: Attachment<HTMLDivElement> = (host) => {
 			attributionControl: true,
 		});
 		addBasemap(L, map);
-		L.rectangle(TILE, {
-			color: MAP_INK.accent,
-			weight: 1.5,
-			fillColor: MAP_INK.accent,
-			fillOpacity: 0.12,
-		})
-			.bindTooltip("Where Viewfinder works")
-			.addTo(map);
-		map.fitBounds(TILE, { padding: [12, 12] });
+		// Salt Lake, Utah and Davis counties: where a camera can stand (OpenStreetMap outlines).
+		const shapes = L.geoJSON(counties, {
+			style: {
+				color: MAP_INK.accent,
+				weight: 1.5,
+				fillColor: MAP_INK.accent,
+				fillOpacity: 0.12,
+			},
+			onEachFeature: (feature, layer) =>
+				layer.bindTooltip(String(feature.properties?.name ?? "")),
+		}).addTo(map);
+		map.fitBounds(shapes.getBounds(), { padding: [12, 12] });
 		remove = () => map.remove();
 	});
 	return () => {
@@ -45,7 +48,7 @@ const coverage: Attachment<HTMLDivElement> = (host) => {
 	style:aspect-ratio={ratio}
 	{@attach coverage}
 	role="img"
-	aria-label="Map of the covered area: the Wasatch Front, from Provo to Salt Lake City"
+	aria-label="Map of the covered area: Salt Lake, Utah and Davis counties"
 ></div>
 
 <style>

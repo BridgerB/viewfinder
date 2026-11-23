@@ -14,8 +14,8 @@ From the repository root, with `data/` present ([[locator/data/dem-grid]]):
 ```sh
 cd sight && cargo build --release && cd ..
 sight/target/release/sight search \
-  data/elevation/envi/n41w112 \
-  data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn \
+  data/elevation/envi/wasatch \
+  data/elevation/field/wasatch.hzn,data/elevation/field/wasatch-rough500.hzn \
   static/sandy.jpg  /tmp/surface.json  /tmp/match.json  --overlay /tmp/overlay.jpg
 ```
 

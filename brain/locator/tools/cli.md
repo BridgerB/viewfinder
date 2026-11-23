@@ -25,7 +25,7 @@ Built with `cargo build --release` in `sight/` (release profile: fat LTO, one co
 | `profile GRID FIELDS IMAGE [--skyline] [--places 500] [--reps 3]` | a fixed `JavaRandom(42)` sample scored repeatedly, for profilers |
 | `compare-fields A B`, `golden …`, `compare-trace …` | [[parity]] checks |
 
-`FIELDS` is comma-separated; always pass both: `data/elevation/field/n41w112.hzn,data/elevation/field/n41w112-rough500.hzn`.
+`FIELDS` is comma-separated; always pass both: `data/elevation/field/wasatch.hzn,data/elevation/field/wasatch-rough500.hzn` with the grid `data/elevation/envi/wasatch` ([[locator/data/three-counties]]). `--sky data/models/skyseg.onnx` on `serve`, `bench` and `sky-trace` traces with the network ([[locator/sky/sky-model]]); `bench --no-guides` ignores the hand-traced skylines; `rewalk GRID FIELD OUT` walks an existing field's places again on another grid.
 
 Every command that reads a photo goes through `photo`: decode, then the guided skyline if given or the [[locator/sky/skyline-trace|tracer]], then decimate to 160 columns. `--fov` switches to the known-lens config ([[locator/config]]).
 

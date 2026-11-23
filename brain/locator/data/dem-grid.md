@@ -13,7 +13,7 @@ sourceRefs:
 
 # DEM grid
 
-The grid is one USGS 1/3 arc-second tile, `n41w112`, converted by GDAL to ENVI: int16, band-sequential, little-endian, 10812 × 10812 cells, ~9.26e-5° per cell (≈10 m north-south, ≈7.8 m east-west at 40.5°N), covering about 40°N–41°N, 112°W–111°W. The header's tie point is the north-west corner of the first cell, half a cell outside the whole degree (west −112.000556, north 41.000556). `EnviHeader::parse` refuses anything not int16 BSQ.
+The grid in use is `wasatch`, nine 1/3 arc-second tiles cropped to three counties plus 50 km ([[three-counties]]): 29,598 × 24,549 cells, 1.45 GB, the same cell size and lattice. What follows was written for the original single tile, `n41w112`, converted by GDAL to ENVI: int16, band-sequential, little-endian, 10812 × 10812 cells, ~9.26e-5° per cell (≈10 m north-south, ≈7.8 m east-west at 40.5°N), covering about 40°N–41°N, 112°W–111°W. The header's tie point is the north-west corner of the first cell, half a cell outside the whole degree (west −112.000556, north 41.000556). `EnviHeader::parse` refuses anything not int16 BSQ.
 
 `sight-io` memory-maps the file and borrows it as `&[i16]` with no copy, so loading the 234 MB grid costs nothing until a cell is touched. `Dem<'a>` is just the georeference plus that slice.
 

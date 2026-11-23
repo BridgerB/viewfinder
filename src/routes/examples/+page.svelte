@@ -137,7 +137,7 @@ const onkeydown = (event: KeyboardEvent) => {
 </article>
 
 <div class="footer">
-	<span>Have a photo from the Wasatch Front?</span>
+	<span>Have a photo from Salt Lake, Utah or Davis County?</span>
 	<a class="pill big" href={resolve("/")}>Try your own</a>
 </div>
 
